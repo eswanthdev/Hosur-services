@@ -27,6 +27,25 @@ body {
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button, input, textarea, select { transition: all 0.2s ease; }
+button:focus-visible {
+  outline: 3px solid #6d28d9;
+  outline-offset: 3px;
+}
+input, select, textarea { min-width: 0; max-width: 100%; }
+.hero-content, .service-card, .provider-card, .booking-form, .review-panel,
+.admin-card, .insta-card, .composer-card, .add-service > *, .news-form > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.review-form input, .review-form select, .review-form textarea,
+.news-form input, .news-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fafafa;
+  color: var(--text);
+}
 
 .app-shell { min-height: 100vh; }
 .topbar {
@@ -156,6 +175,272 @@ button, input, textarea, select { transition: all 0.2s ease; }
 .section-title input:focus {
   border-color: rgba(17, 24, 39, 0.22);
   box-shadow: 0 0 0 4px rgba(17, 24, 39, 0.04);
+}
+.news-section {
+  width: min(1200px, calc(100% - 36px));
+  margin: 6px auto 0;
+  padding: 0 0 24px;
+}
+.news-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.news-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(246,247,249,0.98));
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.03);
+  padding: 20px;
+}
+.news-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.news-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #fff1f2;
+  color: #be123c;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.news-area {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.news-card h3 {
+  margin: 16px 0 10px;
+  font-size: clamp(1.2rem, 1.6vw, 1.7rem);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+.news-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.header-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.72);
+}
+.tab-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 800;
+}
+.tab-button.active {
+  background: var(--text);
+  color: white;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.14);
+}
+.composer-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: rgba(255,255,255,0.94);
+  padding: 18px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.04);
+}
+.composer-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.composer-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #111827 0%, #7c3aed 100%);
+  color: white;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+.composer-header-row strong {
+  display: block;
+  font-size: 0.96rem;
+}
+.composer-header-row small {
+  color: var(--muted);
+}
+.composer-card textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fafafa;
+  padding: 14px 16px;
+  color: var(--text);
+  outline: none;
+}
+.composer-card textarea:focus {
+  border-color: rgba(17, 24, 39, 0.18);
+  box-shadow: 0 0 0 4px rgba(17, 24, 39, 0.04);
+}
+.composer-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.instagram-page {
+  width: min(1200px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 32px 0 60px;
+}
+.instagram-shell {
+  display: grid;
+  gap: 20px;
+}
+.instagram-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 20px;
+}
+.instagram-header h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 4vw, 4rem);
+  letter-spacing: -0.07em;
+}
+.stories-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 16px;
+}
+.story-item {
+  min-height: 120px;
+  border-radius: 26px;
+  display: flex;
+  align-items: end;
+  padding: 14px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+}
+.story-item span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.26);
+  color: white;
+  font-weight: 800;
+  backdrop-filter: blur(4px);
+}
+.instagram-feed {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.insta-card {
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: rgba(255,255,255,0.92);
+  overflow: hidden;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.04);
+}
+.insta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 18px 12px;
+}
+.insta-head strong {
+  display: block;
+  font-size: 1rem;
+}
+.insta-head small {
+  color: var(--muted);
+}
+.insta-visual {
+  position: relative;
+  min-height: 280px;
+  padding: 16px;
+  display: flex;
+  align-items: end;
+}
+.insta-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.28);
+  color: white;
+  font-weight: 800;
+  padding: 8px 12px;
+  backdrop-filter: blur(6px);
+}
+.insta-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+.insta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  align-items: center;
+}
+.feed-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+}
+.feed-action:hover {
+  color: var(--text);
+}
+.feed-action:disabled {
+  color: #be123c;
+  cursor: default;
+}
+a.feed-action:focus-visible {
+  outline: 3px solid #6d28d9;
+  outline-offset: 3px;
+}
+.insta-body p {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.insta-body strong {
+  color: var(--text);
+}
+.insta-body .secondary {
+  justify-self: start;
 }
 .services {
   padding: 18px 0 54px;
@@ -470,6 +755,26 @@ button, input, textarea, select { transition: all 0.2s ease; }
 .add-service { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
 .add-service label { margin: 0; }
 .add-service .primary { height: 48px; }
+.news-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.news-form label {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-weight: 700;
+}
+.news-form textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+.news-form .primary {
+  height: 48px;
+  align-self: end;
+}
 .provider-table {
   display: grid;
   gap: 10px;
@@ -500,6 +805,21 @@ button, input, textarea, select { transition: all 0.2s ease; }
   color: var(--muted);
   margin-top: 3px;
 }
+.provider-area {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 0.8rem;
+}
+.provider-area select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  color: var(--text);
+  background: white;
+}
 .danger-button {
   border: 0;
   border-radius: 10px;
@@ -528,28 +848,123 @@ footer {
 @media (max-width: 840px) {
   .hero-card { flex-direction: column; }
   .hero-panel { min-width: 100%; }
+  .news-grid { grid-template-columns: 1fr; }
   .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .provider-list { grid-template-columns: 1fr; }
-  .booking-stack { grid-template-columns: 1fr; }
+  .booking-stack { grid-template-columns: minmax(0, 1fr); }
+  .instagram-feed { grid-template-columns: minmax(0, 1fr); }
+  .instagram-page { max-width: 640px; }
+  .stories-row {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 8px;
+  }
+  .story-item { flex: 0 0 140px; min-height: 84px; padding: 10px; border-radius: 18px; }
+  .story-item span { font-size: 0.8rem; }
+  .insta-visual { min-height: 120px; }
+  .add-service { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .add-service .primary, .news-form .primary { height: auto; min-height: 48px; }
+  .provider-table-row { grid-template-columns: minmax(0, 1fr); }
+  .provider-table-row.header-row { display: none; }
+  .provider-table-row > * { min-width: 0; overflow-wrap: anywhere; }
+  .admin-card-header, .review-header, .review-meta { flex-wrap: wrap; }
+  button { min-height: 44px; }
+  input, select, textarea { font-size: 16px; }
+  .feed-action { min-width: 44px; min-height: 44px; padding: 10px 8px; }
+  .insta-body p { white-space: pre-wrap; }
 }
 
 @media (max-width: 680px) {
-  .topbar { padding: 11px 16px; }
-  .brand { font-size: 1rem; }
-  .hero { padding-top: 24px; }
-  .section-title { align-items: start; flex-direction: column; }
-  .section-title input { width: 100%; }
-  .service-grid { grid-template-columns: 1fr; }
-  .service-card { min-height: 170px; }
-  .booking-page, .admin-page, .services { width: min(100% - 20px, 1180px); }
-  .add-service { grid-template-columns: 1fr; }
-  .stat-grid { grid-template-columns: 1fr; }
-  .provider-table-row {
-    grid-template-columns: 1fr;
-    padding: 14px;
+  .app-shell {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
-  .provider-table-row.header-row { display: none; }
-  .no-providers { padding: 16px; }
-  .booking-form, .admin-card { padding: 18px; }
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    min-height: 0;
+    padding: calc(8px + env(safe-area-inset-top)) 14px 8px;
+  }
+  .brand { font-size: 1rem; padding: 4px 0; overflow-wrap: anywhere; }
+  .header-actions { display: contents; }
+  .language { grid-column: 2; grid-row: 1; padding: 8px 12px; }
+  .header-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 3px;
+    width: 100%;
+  }
+  .tab-button { padding: 8px; font-size: 0.85rem; overflow-wrap: anywhere; }
+  .hero, .services, .booking-page, .admin-page, .instagram-page {
+    width: calc(100% - 28px);
+  }
+  .hero { padding: 16px 0 8px; gap: 12px; }
+  .hero-card { padding: 22px 18px; border-radius: 24px; align-items: stretch; }
+  .hero h1, .booking-page h1, .admin-page h1, .instagram-header h1 {
+    font-size: clamp(1.8rem, 7.5vw, 2.5rem);
+    line-height: 1.12;
+    letter-spacing: -0.045em;
+    overflow-wrap: anywhere;
+  }
+  .hero-content > p:not(.eyebrow), .intro { font-size: 0.94rem; line-height: 1.55; }
+  .eyebrow { font-size: 0.65rem; margin-bottom: 8px; }
+  .area-picker { width: 100%; gap: 6px; margin-top: 12px; }
+  .services { padding-top: 16px; padding-bottom: 28px; }
+  .section-title { align-items: start; flex-direction: column; }
+  .section-title h2, .admin-card h2, .booking-form h2, .no-providers h2 {
+    font-size: 1.45rem;
+    line-height: 1.25;
+  }
+  .section-title input { width: 100%; min-width: 0; }
+  .chips { gap: 8px; padding: 0 0 14px; }
+  .chips button { flex-shrink: 0; font-size: 0.82rem; padding: 9px 12px; }
+  .service-grid { gap: 10px; }
+  .service-card { min-height: 160px; padding: 14px 12px; border-radius: 18px; }
+  .service-card strong { font-size: 1rem; line-height: 1.3; margin-top: 8px; letter-spacing: -0.02em; }
+  .service-card span, .service-card small { font-size: 0.72rem; line-height: 1.45; }
+  .service-card b { font-size: 0.78rem; line-height: 1.4; padding-top: 14px; }
+  .booking-page, .admin-page, .instagram-page { padding-top: 20px; padding-bottom: 28px; }
+  .provider-top { flex-wrap: wrap; }
+  .provider-top h2 { font-size: 1.3rem; }
+  .no-providers { padding: 16px; gap: 10px; margin-top: 16px; }
+  .no-providers > div { min-width: 0; overflow-wrap: anywhere; }
+  .booking-form, .admin-card, .review-panel, .confirmation { padding: 16px; border-radius: 20px; }
+  .booking-form > button, .review-form > button { width: 100%; margin-top: 8px; }
+  .add-service, .news-form, .stat-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-card h2 { margin-bottom: 14px; }
+  .provider-table-row { padding: 14px; }
+  .instagram-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .instagram-shell { gap: 14px; }
+  .composer-card { padding: 14px; gap: 10px; border-radius: 20px; }
+  .composer-avatar { flex: 0 0 40px; width: 40px; height: 40px; }
+  .composer-header-row > div:last-child { min-width: 0; }
+  .composer-header-row small { font-size: 0.75rem; }
+  .composer-card textarea { min-height: 96px; padding: 12px; }
+  .composer-actions { flex-wrap: wrap; }
+  .insta-card { border-radius: 20px; }
+  .insta-head, .insta-body { padding: 14px; }
+  .insta-head > div { min-width: 0; }
+  .insta-actions { gap: 8px; justify-content: space-between; }
+  .insta-body { gap: 8px; }
+  .insta-body p { font-size: 0.94rem; }
+  footer { padding: 18px 14px calc(18px + env(safe-area-inset-bottom)); line-height: 1.6; }
 }
 
+@media (max-width: 359px) {
+  .service-grid { grid-template-columns: minmax(0, 1fr); }
+  .service-card { min-height: 130px; }
+}
+
+@media (hover: none) {
+  .service-card:hover, .primary:hover, .secondary:hover, .language:hover,
+  .admin-link:hover, .text-button:hover, .chips button:hover { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  button, input, textarea, select { transition: none; }
+}
