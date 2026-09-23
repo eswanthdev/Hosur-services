@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
@@ -63,6 +63,72 @@ describe("renting category", () => {
 beforeEach(() => {
   window.localStorage.clear();
   window.location.hash = "";
+  // Unless a test provides a backend, behave as if the server is unreachable.
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(status === 204 ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+describe("backend sync", () => {
+  const serverState = {
+    services: [{ id: "plumber", name: "Plumber", tamil: "பிளம்பர்", category: "Home repair" }],
+    providerCatalog: { plumber: [{ id: "server-provider", name: "Server plumber", phone: "+919999999999", rating: 4.9, experience: "7 years", serviceId: "plumber", area: "Hosur Town" }] },
+    reviewsByProvider: {},
+    newsItems: [],
+    feedPosts: [{ id: "feed-1", author: "Ravi Kumar", handle: "@ravikumar", location: "Hosur Town", title: "Water issue", caption: "Hi", accent: "red", tag: "#HosurUpdate", likes: 140, likedBy: ["someone"], comments: 0, createdAt: "2026-09-01T00:00:00Z" }],
+    askedFor: ["drone repair"],
+  };
+
+  function mockBackend(handle: (path: string, init?: RequestInit) => Response = () => jsonResponse({})) {
+    const fetchMock = vi.fn((path: string, init?: RequestInit) =>
+      Promise.resolve(path === "/api/state" ? jsonResponse(serverState) : handle(path, init)));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("shows services and providers loaded from the server", async () => {
+    mockBackend();
+    const { container } = render(<App />);
+    await waitFor(() => expect(container.querySelectorAll(".service-card")).toHaveLength(1));
+    fireEvent.click(screen.getByRole("button", { name: /Book Plumber/ }));
+    expect(screen.getByRole("heading", { name: "Server plumber" })).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem(storageKey)!).askedFor).toEqual(["drone repair"]);
+  });
+
+  it("sends admin-added providers to the server", async () => {
+    const fetchMock = mockBackend((_, init) => jsonResponse(JSON.parse(String(init?.body)), 201));
+    window.location.hash = "#admin";
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("1 active")).toBeTruthy());
+    fireEvent.change(screen.getByRole("combobox", { name: "Service" }), { target: { value: "plumber" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Provider name" }), { target: { value: "New plumber" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Phone number" }), { target: { value: "9876543210" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Experience" }), { target: { value: "2 years" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider area" }), { target: { value: "Nallur" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save verified provider" }));
+    const [path, init] = fetchMock.mock.calls.find(([url]) => url === "/api/providers")!;
+    expect(path).toBe("/api/providers");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toMatchObject({ name: "New plumber", phone: "+919876543210", serviceId: "plumber", area: "Nallur" });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("uses the server's like count, which includes other people's likes", async () => {
+    mockBackend(() => jsonResponse({ ...serverState.feedPosts[0], likes: 145, likedBy: ["someone", "9876543210"] }));
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Like post by Ravi Kumar, 140 likes" }));
+    expect(await screen.findByRole("button", { name: "Liked post by Ravi Kumar, 145 likes" })).toBeTruthy();
+  });
+
+  it("warns the admin when the server is unreachable", async () => {
+    window.location.hash = "#admin";
+    render(<App />);
+    expect((await screen.findByRole("status")).textContent).toContain("saved on this device only");
+  });
 });
 
 describe("feed actions", () => {
@@ -128,6 +194,7 @@ describe("feed actions", () => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   window.localStorage.clear();
   window.location.hash = "";
 });

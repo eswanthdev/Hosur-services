@@ -1,0 +1,539 @@
+{
+  "services": [
+    {
+      "id": "plumber",
+      "name": "Plumber",
+      "tamil": "பிளம்பர்",
+      "category": "Home repair"
+    },
+    {
+      "id": "electrician",
+      "name": "Electrician",
+      "tamil": "எலக்ட்ரீஷியன்",
+      "category": "Home repair"
+    },
+    {
+      "id": "carpenter",
+      "name": "Carpenter",
+      "tamil": "தச்சர்",
+      "category": "Home repair"
+    },
+    {
+      "id": "painter",
+      "name": "Painter",
+      "tamil": "பெயிண்டர்",
+      "category": "Home repair"
+    },
+    {
+      "id": "mason-tile",
+      "name": "Mason & tile work",
+      "tamil": "கொத்தனார் மற்றும் டைல்ஸ்",
+      "category": "Home repair"
+    },
+    {
+      "id": "welding",
+      "name": "Welding & grill work",
+      "tamil": "வெல்டிங் மற்றும் கிரில் வேலை",
+      "category": "Home repair"
+    },
+    {
+      "id": "ac-service",
+      "name": "AC service",
+      "tamil": "ஏசி சர்வீஸ்",
+      "category": "Appliances"
+    },
+    {
+      "id": "fridge-repair",
+      "name": "Fridge repair",
+      "tamil": "ஃப்ரிட்ஜ் ரிப்பேர்",
+      "category": "Appliances"
+    },
+    {
+      "id": "washing-machine",
+      "name": "Washing machine repair",
+      "tamil": "வாஷிங் மெஷின் ரிப்பேர்",
+      "category": "Appliances"
+    },
+    {
+      "id": "ro-purifier",
+      "name": "RO purifier",
+      "tamil": "RO ப்யூரிஃபையர்",
+      "category": "Appliances"
+    },
+    {
+      "id": "inverter-ups",
+      "name": "Inverter & UPS",
+      "tamil": "இன்வெர்ட்டர் மற்றும் UPS",
+      "category": "Appliances"
+    },
+    {
+      "id": "water-heater",
+      "name": "Water heater",
+      "tamil": "வாட்டர் ஹீட்டர்",
+      "category": "Appliances"
+    },
+    {
+      "id": "solar-water-heater",
+      "name": "Solar water heater",
+      "tamil": "சோலார் வாட்டர் ஹீட்டர்",
+      "category": "Appliances"
+    },
+    {
+      "id": "tv-repair",
+      "name": "TV repair",
+      "tamil": "டிவி ரிப்பேர்",
+      "category": "Appliances"
+    },
+    {
+      "id": "mobile-laptop",
+      "name": "Mobile & laptop repair",
+      "tamil": "மொபைல் மற்றும் லேப்டாப் ரிப்பேர்",
+      "category": "Appliances"
+    },
+    {
+      "id": "deep-clean",
+      "name": "Full home deep cleaning",
+      "tamil": "வீடு முழு சுத்தம்",
+      "category": "Home cleaning"
+    },
+    {
+      "id": "bathroom-clean",
+      "name": "Bathroom cleaning",
+      "tamil": "குளியலறை சுத்தம்",
+      "category": "Home cleaning"
+    },
+    {
+      "id": "kitchen-clean",
+      "name": "Kitchen cleaning",
+      "tamil": "சமையலறை சுத்தம்",
+      "category": "Home cleaning"
+    },
+    {
+      "id": "sofa-carpet",
+      "name": "Sofa & carpet cleaning",
+      "tamil": "சோபா மற்றும் கார்பெட் சுத்தம்",
+      "category": "Home cleaning"
+    },
+    {
+      "id": "water-tank",
+      "name": "Water tank cleaning",
+      "tamil": "தண்ணீர் தொட்டி சுத்தம்",
+      "category": "Home cleaning"
+    },
+    {
+      "id": "pest-control",
+      "name": "Pest control",
+      "tamil": "பூச்சி கட்டுப்பாடு",
+      "category": "Home cleaning"
+    },
+    {
+      "id": "gardening",
+      "name": "Gardening",
+      "tamil": "தோட்ட பராமரிப்பு",
+      "category": "Outdoors"
+    },
+    {
+      "id": "mosquito-net",
+      "name": "Mosquito net fitting",
+      "tamil": "கொசு வலை பொருத்துதல்",
+      "category": "Outdoors"
+    },
+    {
+      "id": "rainwater",
+      "name": "Rainwater harvesting",
+      "tamil": "மழைநீர் சேகரிப்பு",
+      "category": "Outdoors"
+    },
+    {
+      "id": "borewell",
+      "name": "Borewell & motor",
+      "tamil": "போர்வெல் மற்றும் மோட்டார்",
+      "category": "Outdoors"
+    },
+    {
+      "id": "cctv",
+      "name": "CCTV",
+      "tamil": "CCTV",
+      "category": "Outdoors"
+    },
+    {
+      "id": "solar-panel",
+      "name": "Solar panel",
+      "tamil": "சோலார் பேனல்",
+      "category": "Outdoors"
+    },
+    {
+      "id": "waterproofing",
+      "name": "Terrace waterproofing",
+      "tamil": "மாடி நீர் கசிவு தடுப்பு",
+      "category": "Outdoors"
+    },
+    {
+      "id": "car-wash",
+      "name": "Doorstep car wash",
+      "tamil": "வீட்டிற்கே கார் வாஷ்",
+      "category": "Vehicles"
+    },
+    {
+      "id": "puncture",
+      "name": "Bike & car puncture",
+      "tamil": "பைக் மற்றும் கார் பஞ்சர்",
+      "category": "Vehicles"
+    },
+    {
+      "id": "car-ac",
+      "name": "Car AC cleaning",
+      "tamil": "கார் ஏசி கிளீனிங்",
+      "category": "Vehicles"
+    },
+    {
+      "id": "driver",
+      "name": "Acting driver",
+      "tamil": "தற்காலிக டிரைவர்",
+      "category": "Vehicles"
+    },
+    {
+      "id": "mini-truck",
+      "name": "Mini truck for shifting",
+      "tamil": "ஷிஃப்டிங்கிற்கு மினி டிரக்",
+      "category": "Vehicles"
+    },
+    {
+      "id": "maid",
+      "name": "Housemaid",
+      "tamil": "வீட்டு வேலை உதவியாளர்",
+      "category": "Care at home"
+    },
+    {
+      "id": "cook",
+      "name": "Cook",
+      "tamil": "சமையல்காரர்",
+      "category": "Care at home"
+    },
+    {
+      "id": "babysitter",
+      "name": "Babysitter",
+      "tamil": "குழந்தை பராமரிப்பாளர்",
+      "category": "Care at home"
+    },
+    {
+      "id": "elder-care",
+      "name": "Elder care",
+      "tamil": "முதியோர் பராமரிப்பு",
+      "category": "Care at home"
+    },
+    {
+      "id": "tuition",
+      "name": "Home tuition",
+      "tamil": "வீட்டில் டியூஷன்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "pet-grooming",
+      "name": "Pet grooming",
+      "tamil": "செல்லப்பிராணி அழகுபடுத்தல்",
+      "category": "Pets"
+    },
+    {
+      "id": "pet-cleaner",
+      "name": "Pet cleaner",
+      "tamil": "செல்லப்பிராணி சுத்தம்",
+      "category": "Pets"
+    },
+    {
+      "id": "dog-walking",
+      "name": "Dog walking",
+      "tamil": "நாய் நடைப்பயிற்சி",
+      "category": "Pets"
+    },
+    {
+      "id": "packers-movers",
+      "name": "Packers & movers",
+      "tamil": "பேக்கர்ஸ் மற்றும் மூவர்ஸ்",
+      "category": "Moving & delivery"
+    },
+    {
+      "id": "laundry-ironing",
+      "name": "Laundry & ironing pickup",
+      "tamil": "துணி துவைத்தல் மற்றும் இஸ்திரி",
+      "category": "Home cleaning"
+    },
+    {
+      "id": "locksmith",
+      "name": "Locksmith & lock repair",
+      "tamil": "சாவி மற்றும் பூட்டு பழுது நீக்கம்",
+      "category": "Home repair"
+    },
+    {
+      "id": "gas-stove-chimney",
+      "name": "Gas stove & chimney servicing",
+      "tamil": "எரிவாயு அடுப்பு மற்றும் சிம்னி பராமரிப்பு",
+      "category": "Appliances"
+    },
+    {
+      "id": "bike-service",
+      "name": "Doorstep bike servicing",
+      "tamil": "வீட்டிற்கே பைக் சர்வீஸ்",
+      "category": "Vehicles"
+    },
+    {
+      "id": "water-tanker",
+      "name": "Water tanker booking",
+      "tamil": "தண்ணீர் லாரி முன்பதிவு",
+      "category": "Moving & delivery"
+    },
+    {
+      "id": "septic-drainage",
+      "name": "Septic tank & drainage cleaning",
+      "tamil": "கழிவுநீர் தொட்டி மற்றும் வடிகால் சுத்தம்",
+      "category": "Home cleaning"
+    },
+    {
+      "id": "wifi-setup",
+      "name": "Internet & Wi-Fi setup",
+      "tamil": "இணையம் மற்றும் வைஃபை அமைத்தல்",
+      "category": "Home repair"
+    },
+    {
+      "id": "appliance-installation",
+      "name": "Appliance installation & uninstallation",
+      "tamil": "வீட்டு உபகரணங்கள் பொருத்துதல் மற்றும் அகற்றுதல்",
+      "category": "Appliances"
+    },
+    {
+      "id": "furniture-assembly",
+      "name": "Furniture assembly & repair",
+      "tamil": "மரச்சாமான்கள் பொருத்துதல் மற்றும் பழுது நீக்கம்",
+      "category": "Home repair"
+    },
+    {
+      "id": "curtains-racks",
+      "name": "Curtain, blind & drying rack installation",
+      "tamil": "திரைச்சீலை மற்றும் துணி உலர்த்தும் கம்பி பொருத்துதல்",
+      "category": "Home repair"
+    },
+    {
+      "id": "tailoring",
+      "name": "Doorstep tailoring & alterations",
+      "tamil": "வீட்டிற்கே தையல் மற்றும் ஆடை திருத்தம்",
+      "category": "Personal services"
+    },
+    {
+      "id": "home-salon",
+      "name": "Home salon & grooming",
+      "tamil": "வீட்டிற்கே அழகு பராமரிப்பு",
+      "category": "Personal services"
+    },
+    {
+      "id": "computer-printer",
+      "name": "Computer & printer setup and repair",
+      "tamil": "கணினி மற்றும் பிரிண்டர் அமைத்தல் மற்றும் பழுது நீக்கம்",
+      "category": "Appliances"
+    },
+    {
+      "id": "event-support",
+      "name": "Event decoration, photography, catering & rentals",
+      "tamil": "விழா அலங்காரம், புகைப்படம், உணவு மற்றும் வாடகைப் பொருட்கள்",
+      "category": "Events"
+    },
+    {
+      "id": "home-nursing",
+      "name": "Home nursing",
+      "tamil": "வீட்டிலேயே செவிலியர் சேவை",
+      "category": "Health care"
+    },
+    {
+      "id": "physiotherapy",
+      "name": "Home physiotherapy",
+      "tamil": "வீட்டிலேயே இயன்முறை சிகிச்சை",
+      "category": "Health care"
+    },
+    {
+      "id": "pet-boarding",
+      "name": "Pet boarding & sitting",
+      "tamil": "செல்லப்பிராணி தங்குமிடம் மற்றும் பராமரிப்பு",
+      "category": "Pets"
+    },
+    {
+      "id": "ev-charger",
+      "name": "EV charger installation",
+      "tamil": "மின்சார வாகன சார்ஜர் பொருத்துதல்",
+      "category": "Vehicles"
+    },
+    {
+      "id": "office-maintenance",
+      "name": "Office & shop maintenance",
+      "tamil": "அலுவலகம் மற்றும் கடை பராமரிப்பு",
+      "category": "Home repair"
+    },
+    {
+      "id": "dslr-rental",
+      "name": "DSLR & mirrorless camera rental",
+      "tamil": "DSLR மற்றும் மிரர்லெஸ் கேமரா வாடகை",
+      "category": "Renting"
+    },
+    {
+      "id": "camera-lens-rental",
+      "name": "Camera lens rental",
+      "tamil": "கேமரா லென்ஸ் வாடகை",
+      "category": "Renting"
+    },
+    {
+      "id": "camera-accessory-rental",
+      "name": "Tripod & photography lighting rental",
+      "tamil": "டிரைபாட் மற்றும் புகைப்பட விளக்கு வாடகை",
+      "category": "Renting"
+    },
+    {
+      "id": "projector-rental",
+      "name": "Projector & screen rental",
+      "tamil": "புரொஜெக்டர் மற்றும் திரை வாடகை",
+      "category": "Renting"
+    },
+    {
+      "id": "sound-system-rental",
+      "name": "Speaker & microphone rental",
+      "tamil": "ஒலிபெருக்கி மற்றும் மைக்ரோஃபோன் வாடகை",
+      "category": "Renting"
+    },
+    {
+      "id": "event-furniture-rental",
+      "name": "Party chair & table rental",
+      "tamil": "விழா நாற்காலி மற்றும் மேசை வாடகை",
+      "category": "Renting"
+    },
+    {
+      "id": "tent-rental",
+      "name": "Tent & canopy rental",
+      "tamil": "கூடாரம் மற்றும் பந்தல் வாடகை",
+      "category": "Renting"
+    },
+    {
+      "id": "power-tool-rental",
+      "name": "Power tool rental",
+      "tamil": "மின்சார கருவிகள் வாடகை",
+      "category": "Renting"
+    },
+    {
+      "id": "skating-coach",
+      "name": "Skating coach",
+      "tamil": "ஸ்கேட்டிங் பயிற்சியாளர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "badminton-coach",
+      "name": "Badminton coach",
+      "tamil": "பாட்மிண்டன் பயிற்சியாளர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "swimming-coach",
+      "name": "Swimming coach",
+      "tamil": "நீச்சல் பயிற்சியாளர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "cricket-coach",
+      "name": "Cricket coach",
+      "tamil": "கிரிக்கெட் பயிற்சியாளர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "football-coach",
+      "name": "Football coach",
+      "tamil": "கால்பந்து பயிற்சியாளர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "tennis-coach",
+      "name": "Tennis coach",
+      "tamil": "டென்னிஸ் பயிற்சியாளர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "chess-coach",
+      "name": "Chess coach",
+      "tamil": "சதுரங்க பயிற்சியாளர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "dance-tutor",
+      "name": "Dance tutor",
+      "tamil": "நடன ஆசிரியர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "music-tutor",
+      "name": "Music tutor",
+      "tamil": "இசை ஆசிரியர்",
+      "category": "Tutors & coaches"
+    },
+    {
+      "id": "yoga-instructor",
+      "name": "Yoga instructor",
+      "tamil": "யோகா பயிற்சியாளர்",
+      "category": "Tutors & coaches"
+    }
+  ],
+  "newsItems": [
+    {
+      "id": "news-grt-water",
+      "badge": "Water alert",
+      "area": "GRT layout",
+      "title": "Water clog warning near GRT layout",
+      "summary": "Residents in GRT and nearby lanes are reporting slow drainage after heavy rain. Local plumbers are available for quick clearing."
+    },
+    {
+      "id": "news-attibele-pipeline",
+      "badge": "Service strike",
+      "area": "Attibele",
+      "title": "Pipeline maintenance in Attibele this week",
+      "summary": "A local water supply interruption is expected in parts of Attibele. Residents are advised to book urgent plumbing support early."
+    },
+    {
+      "id": "news-sipcot-power",
+      "badge": "Hosur update",
+      "area": "SIPCOT",
+      "title": "Power backup demand rising in SIPCOT",
+      "summary": "Several households in SIPCOT and Hosur Town are requesting urgent electrical checks and inverter support before the weekend."
+    }
+  ],
+  "feedPosts": [
+    {
+      "id": "feed-1",
+      "author": "Ravi Kumar",
+      "handle": "@ravikumar",
+      "location": "Hosur Town",
+      "title": "Water issue",
+      "caption": "Water is standing near the GRT road after the rain and roads are getting slippery. Neighbors, please stay careful and share if you know a quick fix.",
+      "accent": "linear-gradient(135deg, #60a5fa 0%, #22d3ee 40%, #a78bfa 100%)",
+      "tag": "#HosurUpdate",
+      "likes": 128,
+      "comments": 24
+    },
+    {
+      "id": "feed-2",
+      "author": "Meena",
+      "handle": "@meenahsr",
+      "location": "SIPCOT",
+      "title": "Streetlight issue",
+      "caption": "The streetlights near the SIPCOT lane have been off for two nights. It feels unsafe for people returning late from work.",
+      "accent": "linear-gradient(135deg, #f59e0b 0%, #f97316 40%, #ef4444 100%)",
+      "tag": "#SafetyAlert",
+      "likes": 94,
+      "comments": 18
+    },
+    {
+      "id": "feed-3",
+      "author": "Arun",
+      "handle": "@arunlocal",
+      "location": "Attibele",
+      "title": "Water supply delay",
+      "caption": "Water supply has been weak in our block since morning. We are checking with the nearby residents to see if this is happening across Attibele.",
+      "accent": "linear-gradient(135deg, #34d399 0%, #10b981 40%, #0ea5e9 100%)",
+      "tag": "#CommunityNotice",
+      "likes": 210,
+      "comments": 33
+    }
+  ]
+}

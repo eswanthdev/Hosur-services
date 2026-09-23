@@ -1,12 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { hosurApi, type FeedPost, type NewsItem, type Provider, type Review, type Service } from "./api/hosur";
 import "./styles.css";
 
-type Service = { id: string; name: string; tamil: string; category: string };
-type Provider = { id: string; name: string; phone: string; rating: number; experience: string; serviceId: string; area?: string };
-type Review = { id: string; providerId: string; userName: string; rating: number; comment: string; createdAt: string };
-type FeedPost = { id: string; author: string; handle: string; location: string; title: string; caption: string; accent: string; tag: string; likes: number; likedBy?: string[]; comments: number; createdAt: string };
 type UserProfile = { name: string; phone: string; address: string };
 type CustomerTab = "home" | "feed";
+type SyncStatus = "connecting" | "online" | "offline";
 
 const areas = ["Hosur Town", "Bagalur", "Bagalur Road", "Nallur", "Mathigiri", "Zuzuvadi", "SIPCOT", "Mookandapalli", "Shanthi Nagar", "Avalapalli", "Thally Road", "Attibele"];
 const loggedInUser: UserProfile = { name: "Ravi Kumar", phone: "9876543210", address: "12, 2nd Cross, SIPCOT, Hosur" };
@@ -108,7 +106,7 @@ export function App() {
   });
   const [providerCatalog, setProviderCatalog] = useState<Record<string, Provider[]>>(() => readStoredState()?.providerCatalog ?? initialProviderCatalog);
   const [reviewsByProvider, setReviewsByProvider] = useState<Record<string, Review[]>>(() => readStoredState()?.reviewsByProvider ?? initialReviews);
-  const [newsItems, setNewsItems] = useState<Array<{ id: string; badge: string; area: string; title: string; summary: string }>>(() => readStoredState()?.newsItems ?? defaultNewsItems);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>(() => readStoredState()?.newsItems ?? defaultNewsItems);
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>(() => {
     const storedPosts = readStoredState()?.feedPosts;
     const sanitized = Array.isArray(storedPosts)
@@ -137,6 +135,33 @@ export function App() {
   const [askedFor, setAskedFor] = useState<string[]>(() => readStoredState()?.askedFor ?? []);
   const [postDraft, setPostDraft] = useState("");
   const [providerError, setProviderError] = useState("");
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("connecting");
+
+  // The backend is the source of truth; localStorage keeps the last known
+  // state so the app still works (on this device only) when it is unreachable.
+  useEffect(() => {
+    let cancelled = false;
+    hosurApi.getState().then((state) => {
+      if (cancelled) return;
+      setServices(state.services);
+      setProviderCatalog(state.providerCatalog);
+      setReviewsByProvider(state.reviewsByProvider);
+      setNewsItems(state.newsItems);
+      setFeedPosts(state.feedPosts);
+      setAskedFor(state.askedFor);
+      setSyncStatus("online");
+    }, () => {
+      if (!cancelled) setSyncStatus("offline");
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  function sync<T>(change: Promise<T>, onSaved?: (saved: T) => void) {
+    change.then(onSaved, (error: unknown) => {
+      console.warn("Could not save to the Hosur Services backend:", error);
+      setSyncStatus("offline");
+    });
+  }
 
   useEffect(() => {
     const syncViewFromHash = () => {
@@ -216,7 +241,9 @@ export function App() {
     const name = String(form.get("name") ?? "").trim();
     const serviceCategory = String(form.get("category") ?? "");
     if (!name || !serviceCategory) return;
-    setServices((current) => [...current, { id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`, name, tamil: name, category: serviceCategory }]);
+    const newService: Service = { id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`, name, tamil: name, category: serviceCategory };
+    setServices((current) => [...current, newService]);
+    sync(hosurApi.addService(newService));
     event.currentTarget.reset();
   }
 
@@ -229,7 +256,7 @@ export function App() {
     const summary = String(form.get("newsSummary") ?? "").trim();
     if (!badge || !area || !title || !summary) return;
 
-    const newItem = {
+    const newItem: NewsItem = {
       id: `news-${Date.now()}`,
       badge,
       area,
@@ -238,6 +265,7 @@ export function App() {
     };
 
     setNewsItems((current) => [newItem, ...current]);
+    sync(hosurApi.addNewsItem(newItem));
     event.currentTarget.reset();
   }
 
@@ -280,6 +308,7 @@ export function App() {
       ...current,
       [serviceId]: [...(current[serviceId] ?? []), newProvider],
     }));
+    sync(hosurApi.addProvider(newProvider));
 
     event.currentTarget.reset();
   }
@@ -294,6 +323,7 @@ export function App() {
         Object.entries(next).filter(([, providers]) => providers.length > 0),
       );
     });
+    sync(hosurApi.removeProvider(providerId));
   }
 
   function updateProviderArea(providerId: string, providerArea: string) {
@@ -303,6 +333,7 @@ export function App() {
         providers.map((provider) => provider.id === providerId ? { ...provider, area: providerArea } : provider),
       ]),
     ));
+    sync(hosurApi.updateProviderArea(providerId, providerArea));
   }
 
   function submitReview(event: FormEvent<HTMLFormElement>) {
@@ -324,6 +355,7 @@ export function App() {
       ...current,
       [selectedProvider.id]: [newReview, ...(current[selectedProvider.id] ?? [])],
     }));
+    sync(hosurApi.addReview(newReview));
 
     setReviewDraft((current) => ({ ...current, comment: "", rating: 5 }));
   }
@@ -363,15 +395,26 @@ export function App() {
     };
 
     setFeedPosts((current) => [newPost, ...current]);
+    sync(hosurApi.addFeedPost(newPost));
     setPostDraft("");
   }
 
   function likePost(postId: string) {
+    if (feedPosts.find((post) => post.id === postId)?.likedBy?.includes(userProfile.phone)) return;
     setFeedPosts((current) => current.map((post) =>
       post.id === postId && !post.likedBy?.includes(userProfile.phone)
         ? { ...post, likes: post.likes + 1, likedBy: [...(post.likedBy ?? []), userProfile.phone] }
         : post,
     ));
+    // The server's count also includes likes from other people since the page loaded.
+    sync(hosurApi.likePost(postId, userProfile.phone), (saved) =>
+      setFeedPosts((current) => current.map((post) => post.id === saved.id ? saved : post)),
+    );
+  }
+
+  function saveAskedFor(queryText: string) {
+    setAskedFor((current) => [...current, queryText]);
+    sync(hosurApi.addAskedFor(queryText));
   }
 
   function whatsappShareUrl(post: FeedPost) {
@@ -385,6 +428,7 @@ export function App() {
       <section className="admin-page">
         <p className="eyebrow">FOUNDER DESK</p><h1>Start with verified providers.</h1>
         <p className="intro">Only approved providers appear in the customer portal. Add the verified details here and they will instantly become available for booking.</p>
+        {syncStatus === "offline" && <p className="sync-warning" role="status">Cannot reach the Hosur Services server. Changes are saved on this device only and will not be shown to customers.</p>}
         <div className="stat-grid"><article><strong>{liveProviders.length}</strong><span>Live providers</span></article><article><strong>{askedFor.length}</strong><span>Bookings requested</span></article><article><strong>{services.length}</strong><span>Active services</span></article></div>
 
         <section className="admin-card"><h2>Add a service</h2><form onSubmit={addService} className="add-service"><label>Service name<input required name="name" placeholder="e.g. Curtain fitting" /></label><label>Category<select required name="category"><option value="">Choose category</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></label><button className="primary">Add service</button></form></section>
@@ -557,7 +601,7 @@ export function App() {
                 <div className="empty">
                   <h3>We do not have this service listed yet.</h3>
                   <p>We have saved your request so the founder can review it this week.</p>
-                  <button className="primary" onClick={() => { if (query.trim()) setAskedFor((current) => [...current, query.trim()]); }}>Save request</button>
+                  <button className="primary" onClick={() => { if (query.trim()) saveAskedFor(query.trim()); }}>Save request</button>
                 </div>
               )}
             </section>

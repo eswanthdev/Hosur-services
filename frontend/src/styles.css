@@ -721,6 +721,14 @@ a.feed-action:focus-visible {
   font-weight: 800;
 }
 .admin-page > .intro { margin-bottom: 18px; }
+.sync-warning {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 600;
+}
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
