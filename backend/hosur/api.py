@@ -5,12 +5,14 @@ server stays in step without a round trip to learn the new id.
 """
 
 import os
+import re
+from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, HttpUrl, StringConstraints, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 from hosur.store import Store
@@ -91,6 +93,99 @@ class AskedForIn(CamelModel):
     query: NonEmpty
 
 
+INDIA_TIMEZONE = timezone(timedelta(hours=5, minutes=30))
+
+
+class VerifiedUpdateIn(CamelModel):
+    id: NonEmpty
+    source_url: HttpUrl
+    verified_at: date
+
+    @field_validator("verified_at", mode="before")
+    @classmethod
+    def validate_verification_date(cls, value):
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+            raise ValueError("verifiedAt must be a YYYY-MM-DD date.")
+        return value
+
+    @field_validator("verified_at")
+    @classmethod
+    def reject_future_verification(cls, value):
+        if value > datetime.now(INDIA_TIMEZONE).date():
+            raise ValueError("verifiedAt cannot be in the future in India.")
+        return value
+
+    def dump(self) -> dict:
+        return self.model_dump(mode="json", by_alias=True)
+
+
+def validate_iso_timestamp(value):
+    if not isinstance(value, str):
+        raise ValueError("Timestamp must be an ISO string with a timezone.")
+    datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return value
+
+
+IsoTimestamp = Annotated[AwareDatetime, BeforeValidator(validate_iso_timestamp)]
+
+
+class PowerShutdownIn(VerifiedUpdateIn):
+    title: NonEmpty
+    areas: list[NonEmpty] = Field(min_length=1)
+    starts_at: IsoTimestamp
+    ends_at: IsoTimestamp
+    reason: NonEmpty
+
+    @model_validator(mode="after")
+    def validate_time_range(self):
+        if self.ends_at <= self.starts_at:
+            raise ValueError("endsAt must be after startsAt.")
+        return self
+
+
+class ChargingStationIn(VerifiedUpdateIn):
+    name: NonEmpty
+    area: NonEmpty
+    address: NonEmpty
+    connectors: NonEmpty
+    hours: NonEmpty
+
+
+class CivicAlertIn(VerifiedUpdateIn):
+    title: NonEmpty
+    category: Literal["water", "traffic", "waste"]
+    areas: list[NonEmpty]
+    route: Annotated[str, StringConstraints(strip_whitespace=True)] = ""
+    message: NonEmpty
+    starts_at: IsoTimestamp
+    expires_at: IsoTimestamp
+
+    @model_validator(mode="after")
+    def validate_alert(self):
+        if self.category == "traffic":
+            if not self.route:
+                raise ValueError("Traffic alerts require a route.")
+        elif not self.areas:
+            raise ValueError("Water and waste alerts require at least one area.")
+        if self.expires_at <= self.starts_at:
+            raise ValueError("expiresAt must be after startsAt.")
+        return self
+
+
+class EmergencyContactIn(VerifiedUpdateIn):
+    name: NonEmpty
+    service: NonEmpty
+    phone: str
+    details: NonEmpty
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value):
+        if not re.fullmatch(r"\+?[0-9 ()-]+", value) or not 3 <= len(re.findall(r"[0-9]", value)) <= 15:
+            raise ValueError("Phone must contain 3-15 digits and only an optional leading +, spaces, hyphens or parentheses.")
+        return value
+
+
 router = APIRouter(prefix="/api")
 
 
@@ -103,6 +198,95 @@ def _created(result, conflict: str):
 @router.get("/state")
 def get_state(store: Store = Depends(get_store)):
     return store.get_state()
+
+
+@router.get("/updates")
+def get_updates(store: Store = Depends(get_store)):
+    return store.get_updates()
+
+
+@router.post("/shutdowns", status_code=201)
+def add_shutdown(shutdown: PowerShutdownIn, store: Store = Depends(get_store)):
+    return _created(store.add_shutdown(shutdown.dump()), "A shutdown with this id already exists.")
+
+
+@router.put("/shutdowns/{shutdown_id}")
+def update_shutdown(shutdown_id: str, shutdown: PowerShutdownIn, store: Store = Depends(get_store)):
+    if shutdown.id != shutdown_id:
+        raise HTTPException(status_code=422, detail="Body id must match the shutdown id.")
+    result = store.update_shutdown(shutdown.dump())
+    if result is None:
+        raise HTTPException(status_code=404, detail="Shutdown not found.")
+    return result
+
+
+@router.delete("/shutdowns/{shutdown_id}", status_code=204)
+def delete_shutdown(shutdown_id: str, store: Store = Depends(get_store)):
+    if not store.delete_shutdown(shutdown_id):
+        raise HTTPException(status_code=404, detail="Shutdown not found.")
+
+
+@router.post("/charging-stations", status_code=201)
+def add_charging_station(station: ChargingStationIn, store: Store = Depends(get_store)):
+    return _created(store.add_charging_station(station.dump()), "A charging station with this id already exists.")
+
+
+@router.put("/charging-stations/{station_id}")
+def update_charging_station(station_id: str, station: ChargingStationIn, store: Store = Depends(get_store)):
+    if station.id != station_id:
+        raise HTTPException(status_code=422, detail="Body id must match the charging station id.")
+    result = store.update_charging_station(station.dump())
+    if result is None:
+        raise HTTPException(status_code=404, detail="Charging station not found.")
+    return result
+
+
+@router.delete("/charging-stations/{station_id}", status_code=204)
+def delete_charging_station(station_id: str, store: Store = Depends(get_store)):
+    if not store.delete_charging_station(station_id):
+        raise HTTPException(status_code=404, detail="Charging station not found.")
+
+
+@router.post("/civic-alerts", status_code=201)
+def add_civic_alert(alert: CivicAlertIn, store: Store = Depends(get_store)):
+    return _created(store.add_civic_alert(alert.dump()), "A civic alert with this id already exists.")
+
+
+@router.put("/civic-alerts/{alert_id}")
+def update_civic_alert(alert_id: str, alert: CivicAlertIn, store: Store = Depends(get_store)):
+    if alert.id != alert_id:
+        raise HTTPException(status_code=422, detail="Body id must match the civic alert id.")
+    result = store.update_civic_alert(alert.dump())
+    if result is None:
+        raise HTTPException(status_code=404, detail="Civic alert not found.")
+    return result
+
+
+@router.delete("/civic-alerts/{alert_id}", status_code=204)
+def delete_civic_alert(alert_id: str, store: Store = Depends(get_store)):
+    if not store.delete_civic_alert(alert_id):
+        raise HTTPException(status_code=404, detail="Civic alert not found.")
+
+
+@router.post("/emergency-contacts", status_code=201)
+def add_emergency_contact(contact: EmergencyContactIn, store: Store = Depends(get_store)):
+    return _created(store.add_emergency_contact(contact.dump()), "An emergency contact with this id already exists.")
+
+
+@router.put("/emergency-contacts/{contact_id}")
+def update_emergency_contact(contact_id: str, contact: EmergencyContactIn, store: Store = Depends(get_store)):
+    if contact.id != contact_id:
+        raise HTTPException(status_code=422, detail="Body id must match the emergency contact id.")
+    result = store.update_emergency_contact(contact.dump())
+    if result is None:
+        raise HTTPException(status_code=404, detail="Emergency contact not found.")
+    return result
+
+
+@router.delete("/emergency-contacts/{contact_id}", status_code=204)
+def delete_emergency_contact(contact_id: str, store: Store = Depends(get_store)):
+    if not store.delete_emergency_contact(contact_id):
+        raise HTTPException(status_code=404, detail="Emergency contact not found.")
 
 
 @router.post("/services", status_code=201)

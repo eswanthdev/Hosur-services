@@ -67,6 +67,47 @@ CREATE TABLE IF NOT EXISTS asked_for (
     query TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS power_shutdowns (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    areas TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    verified_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS charging_stations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    area TEXT NOT NULL,
+    address TEXT NOT NULL,
+    connectors TEXT NOT NULL,
+    hours TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    verified_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS civic_alerts (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    areas TEXT NOT NULL,
+    route TEXT NOT NULL,
+    message TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    verified_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS emergency_contacts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    service TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    details TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    verified_at TEXT NOT NULL
+);
 """
 
 
@@ -140,6 +181,68 @@ class Store:
             "askedFor": asked_for,
         }
 
+    def get_updates(self) -> dict:
+        with self._connect() as conn:
+            return {
+                "shutdowns": [self._shutdown(row) for row in conn.execute("SELECT * FROM power_shutdowns ORDER BY rowid")],
+                "chargingStations": [self._charging_station(row) for row in conn.execute("SELECT * FROM charging_stations ORDER BY rowid")],
+                "civicAlerts": [self._civic_alert(row) for row in conn.execute("SELECT * FROM civic_alerts ORDER BY rowid")],
+                "emergencyContacts": [self._emergency_contact(row) for row in conn.execute("SELECT * FROM emergency_contacts ORDER BY rowid")],
+            }
+
+    @staticmethod
+    def _shutdown(row: sqlite3.Row) -> dict:
+        return {
+            "id": row["id"],
+            "title": row["title"],
+            "areas": json.loads(row["areas"]),
+            "startsAt": row["starts_at"],
+            "endsAt": row["ends_at"],
+            "reason": row["reason"],
+            "sourceUrl": row["source_url"],
+            "verifiedAt": row["verified_at"],
+        }
+
+    @staticmethod
+    def _charging_station(row: sqlite3.Row) -> dict:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "area": row["area"],
+            "address": row["address"],
+            "connectors": row["connectors"],
+            "hours": row["hours"],
+            "sourceUrl": row["source_url"],
+            "verifiedAt": row["verified_at"],
+        }
+
+    @staticmethod
+    def _civic_alert(row: sqlite3.Row) -> dict:
+        return {
+            "id": row["id"],
+            "title": row["title"],
+            "category": row["category"],
+            "areas": json.loads(row["areas"]),
+            "route": row["route"],
+            "message": row["message"],
+            "startsAt": row["starts_at"],
+            "expiresAt": row["expires_at"],
+            "sourceUrl": row["source_url"],
+            "verifiedAt": row["verified_at"],
+        }
+
+    @staticmethod
+    def _emergency_contact(row: sqlite3.Row) -> dict:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "service": row["service"],
+            "phone": row["phone"],
+            "details": row["details"],
+            "sourceUrl": row["source_url"],
+            "verifiedAt": row["verified_at"],
+        }
+
     @staticmethod
     def _provider(row: sqlite3.Row) -> dict:
         provider = {
@@ -186,6 +289,107 @@ class Store:
     # ---- writes ------------------------------------------------------------
     # Each write returns None when the change conflicts with existing data
     # (duplicate id, missing parent) so the API can map it to an HTTP error.
+
+    def add_shutdown(self, shutdown: dict) -> dict | None:
+        with self._connect() as conn:
+            try:
+                conn.execute(
+                    "INSERT INTO power_shutdowns (id, title, areas, starts_at, ends_at, reason, source_url, verified_at)"
+                    " VALUES (:id, :title, :areas, :startsAt, :endsAt, :reason, :sourceUrl, :verifiedAt)",
+                    {**shutdown, "areas": json.dumps(shutdown["areas"])},
+                )
+            except sqlite3.IntegrityError:
+                return None
+        return shutdown
+
+    def update_shutdown(self, shutdown: dict) -> dict | None:
+        with self._connect() as conn:
+            updated = conn.execute(
+                "UPDATE power_shutdowns SET title = :title, areas = :areas, starts_at = :startsAt,"
+                " ends_at = :endsAt, reason = :reason, source_url = :sourceUrl, verified_at = :verifiedAt WHERE id = :id",
+                {**shutdown, "areas": json.dumps(shutdown["areas"])},
+            ).rowcount
+        return shutdown if updated else None
+
+    def delete_shutdown(self, shutdown_id: str) -> bool:
+        with self._connect() as conn:
+            return conn.execute("DELETE FROM power_shutdowns WHERE id = ?", (shutdown_id,)).rowcount > 0
+
+    def add_charging_station(self, station: dict) -> dict | None:
+        with self._connect() as conn:
+            try:
+                conn.execute(
+                    "INSERT INTO charging_stations (id, name, area, address, connectors, hours, source_url, verified_at)"
+                    " VALUES (:id, :name, :area, :address, :connectors, :hours, :sourceUrl, :verifiedAt)",
+                    station,
+                )
+            except sqlite3.IntegrityError:
+                return None
+        return station
+
+    def update_charging_station(self, station: dict) -> dict | None:
+        with self._connect() as conn:
+            updated = conn.execute(
+                "UPDATE charging_stations SET name = :name, area = :area, address = :address, connectors = :connectors,"
+                " hours = :hours, source_url = :sourceUrl, verified_at = :verifiedAt WHERE id = :id",
+                station,
+            ).rowcount
+        return station if updated else None
+
+    def delete_charging_station(self, station_id: str) -> bool:
+        with self._connect() as conn:
+            return conn.execute("DELETE FROM charging_stations WHERE id = ?", (station_id,)).rowcount > 0
+
+    def add_civic_alert(self, alert: dict) -> dict | None:
+        with self._connect() as conn:
+            try:
+                conn.execute(
+                    "INSERT INTO civic_alerts (id, title, category, areas, route, message, starts_at, expires_at, source_url, verified_at)"
+                    " VALUES (:id, :title, :category, :areas, :route, :message, :startsAt, :expiresAt, :sourceUrl, :verifiedAt)",
+                    {**alert, "areas": json.dumps(alert["areas"])},
+                )
+            except sqlite3.IntegrityError:
+                return None
+        return alert
+
+    def update_civic_alert(self, alert: dict) -> dict | None:
+        with self._connect() as conn:
+            updated = conn.execute(
+                "UPDATE civic_alerts SET title = :title, category = :category, areas = :areas, route = :route,"
+                " message = :message, starts_at = :startsAt, expires_at = :expiresAt,"
+                " source_url = :sourceUrl, verified_at = :verifiedAt WHERE id = :id",
+                {**alert, "areas": json.dumps(alert["areas"])},
+            ).rowcount
+        return alert if updated else None
+
+    def delete_civic_alert(self, alert_id: str) -> bool:
+        with self._connect() as conn:
+            return conn.execute("DELETE FROM civic_alerts WHERE id = ?", (alert_id,)).rowcount > 0
+
+    def add_emergency_contact(self, contact: dict) -> dict | None:
+        with self._connect() as conn:
+            try:
+                conn.execute(
+                    "INSERT INTO emergency_contacts (id, name, service, phone, details, source_url, verified_at)"
+                    " VALUES (:id, :name, :service, :phone, :details, :sourceUrl, :verifiedAt)",
+                    contact,
+                )
+            except sqlite3.IntegrityError:
+                return None
+        return contact
+
+    def update_emergency_contact(self, contact: dict) -> dict | None:
+        with self._connect() as conn:
+            updated = conn.execute(
+                "UPDATE emergency_contacts SET name = :name, service = :service, phone = :phone,"
+                " details = :details, source_url = :sourceUrl, verified_at = :verifiedAt WHERE id = :id",
+                contact,
+            ).rowcount
+        return contact if updated else None
+
+    def delete_emergency_contact(self, contact_id: str) -> bool:
+        with self._connect() as conn:
+            return conn.execute("DELETE FROM emergency_contacts WHERE id = ?", (contact_id,)).rowcount > 0
 
     def add_service(self, service: dict) -> dict | None:
         with self._connect() as conn:

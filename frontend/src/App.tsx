@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { hosurApi, type FeedPost, type NewsItem, type Provider, type Review, type Service } from "./api/hosur";
 import "./styles.css";
+import { Updates } from "./Updates";
 
 type UserProfile = { name: string; phone: string; address: string };
-type CustomerTab = "home" | "feed";
+type CustomerTab = "home" | "feed" | "updates";
 type SyncStatus = "connecting" | "online" | "offline";
 
 const areas = ["Hosur Town", "Bagalur", "Bagalur Road", "Nallur", "Mathigiri", "Zuzuvadi", "SIPCOT", "Mookandapalli", "Shanthi Nagar", "Avalapalli", "Thally Road", "Attibele"];
@@ -428,7 +429,7 @@ export function App() {
       <section className="admin-page">
         <p className="eyebrow">FOUNDER DESK</p><h1>Start with verified providers.</h1>
         <p className="intro">Only approved providers appear in the customer portal. Add the verified details here and they will instantly become available for booking.</p>
-        {syncStatus === "offline" && <p className="sync-warning" role="status">Cannot reach the Hosur Services server. Changes are saved on this device only and will not be shown to customers.</p>}
+        {syncStatus === "offline" && <p className="sync-warning" role="status">Cannot reach the Hosur Services server. Changes are saved on this device only and will not be shown to customers. All entries in Manage local updates require a server connection to save.</p>}
         <div className="stat-grid"><article><strong>{liveProviders.length}</strong><span>Live providers</span></article><article><strong>{askedFor.length}</strong><span>Bookings requested</span></article><article><strong>{services.length}</strong><span>Active services</span></article></div>
 
         <section className="admin-card"><h2>Add a service</h2><form onSubmit={addService} className="add-service"><label>Service name<input required name="name" placeholder="e.g. Curtain fitting" /></label><label>Category<select required name="category"><option value="">Choose category</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></label><button className="primary">Add service</button></form></section>
@@ -477,6 +478,7 @@ export function App() {
           )}
         </section>
 
+        <Updates admin areas={areas} area={area} onAreaChange={setArea} language={language} />
         <section className="admin-card"><h2>Asked-for list</h2>{askedFor.length ? <ul>{askedFor.map((item) => <li key={item}>{item}</li>)}</ul> : <p>No unmatched searches recorded yet.</p>}</section>
       </section>
     </main>;
@@ -492,13 +494,14 @@ export function App() {
           <nav className="header-tabs" aria-label="Customer navigation">
             <button className={customerTab === "home" ? "tab-button active" : "tab-button"} aria-current={customerTab === "home" ? "page" : undefined} onClick={() => openCustomerTab("home")}>Home</button>
             <button className={customerTab === "feed" ? "tab-button active" : "tab-button"} aria-current={customerTab === "feed" ? "page" : undefined} onClick={() => openCustomerTab("feed")}>Feed</button>
+            <button className={customerTab === "updates" ? "tab-button active" : "tab-button"} aria-current={customerTab === "updates" ? "page" : undefined} onClick={() => openCustomerTab("updates")}>{language === "ta" ? "அறிவிப்புகள்" : "Updates"}</button>
           </nav>
           <button className="language" onClick={() => setLanguage(language === "en" ? "ta" : "en")}>{language === "en" ? "தமிழ்" : "English"}</button>
         </div>
       </header>
 
       {!selectedService ? (
-        customerTab === "feed" ? (
+        customerTab === "updates" ? <Updates areas={areas} area={area} onAreaChange={setArea} language={language} /> : customerTab === "feed" ? (
           <section className="instagram-page">
             <div className="instagram-shell">
               <div className="instagram-header">

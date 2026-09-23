@@ -84,7 +84,7 @@ describe("backend sync", () => {
 
   function mockBackend(handle: (path: string, init?: RequestInit) => Response = () => jsonResponse({})) {
     const fetchMock = vi.fn((path: string, init?: RequestInit) =>
-      Promise.resolve(path === "/api/state" ? jsonResponse(serverState) : handle(path, init)));
+      Promise.resolve(path === "/api/state" ? jsonResponse(serverState) : path === "/api/updates" ? jsonResponse({ shutdowns: [], chargingStations: [], civicAlerts: [], emergencyContacts: [] }) : handle(path, init)));
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   }
@@ -251,7 +251,7 @@ describe("expanded service catalogue", () => {
   describe("tutors and coaches", () => {
     it("filters home tuition and coaches within the services catalogue, without a separate tab", () => {
       const { container } = render(<App />);
-      expect(screen.getByRole("navigation", { name: "Customer navigation" }).querySelectorAll("button")).toHaveLength(2);
+      expect(Array.from(screen.getByRole("navigation", { name: "Customer navigation" }).querySelectorAll("button"), (button) => button.textContent)).toEqual(["Home", "Feed", "Updates"]);
       fireEvent.click(screen.getByRole("button", { name: "Tutors & coaches" }));
       expect(container.querySelectorAll(".service-card")).toHaveLength(11);
       expect(screen.getByRole("button", { name: /Book Home tuition/ })).toBeTruthy();
