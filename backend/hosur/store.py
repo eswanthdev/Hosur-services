@@ -6,10 +6,12 @@ them: catalogue items oldest-first, news/feed/reviews newest-first.
 """
 
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 SEED_PATH = Path(__file__).with_name("seed_data.json")
 
@@ -37,6 +39,21 @@ CREATE TABLE IF NOT EXISTS reviews (
     comment TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS provider_applications (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    service_ids TEXT NOT NULL,
+    area TEXT NOT NULL,
+    experience TEXT NOT NULL,
+    language TEXT NOT NULL CHECK (language IN ('en', 'ta', 'te', 'kn')),
+    consent INTEGER NOT NULL CHECK (consent = 1),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at TEXT NOT NULL,
+    reviewed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS provider_applications_phone_status
+    ON provider_applications (phone, status);
 CREATE TABLE IF NOT EXISTS news_items (
     id TEXT PRIMARY KEY,
     badge TEXT NOT NULL,
@@ -99,20 +116,25 @@ CREATE TABLE IF NOT EXISTS civic_alerts (
     source_url TEXT NOT NULL,
     verified_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS emergency_contacts (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    service TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    details TEXT NOT NULL,
-    source_url TEXT NOT NULL,
-    verified_at TEXT NOT NULL
-);
 """
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def normalize_india_mobile(phone: str) -> str:
+    compact = re.sub(r"[ -]", "", phone)
+    if not re.fullmatch(r"(?:\+91|91)?[6-9][0-9]{9}", compact):
+        raise ValueError("Phone must be a valid Indian mobile number.")
+    return "+91" + compact[-10:]
+
+
+class ApplicationError(Exception):
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
 
 
 class Store:
@@ -160,7 +182,7 @@ class Store:
 
             provider_catalog: dict[str, list[dict]] = {}
             for row in conn.execute("SELECT * FROM providers ORDER BY rowid"):
-                provider = self._provider(row)
+                provider = self._provider(conn, row)
                 provider_catalog.setdefault(provider["serviceId"], []).append(provider)
 
             reviews_by_provider: dict[str, list[dict]] = {}
@@ -187,7 +209,6 @@ class Store:
                 "shutdowns": [self._shutdown(row) for row in conn.execute("SELECT * FROM power_shutdowns ORDER BY rowid")],
                 "chargingStations": [self._charging_station(row) for row in conn.execute("SELECT * FROM charging_stations ORDER BY rowid")],
                 "civicAlerts": [self._civic_alert(row) for row in conn.execute("SELECT * FROM civic_alerts ORDER BY rowid")],
-                "emergencyContacts": [self._emergency_contact(row) for row in conn.execute("SELECT * FROM emergency_contacts ORDER BY rowid")],
             }
 
     @staticmethod
@@ -232,30 +253,135 @@ class Store:
         }
 
     @staticmethod
-    def _emergency_contact(row: sqlite3.Row) -> dict:
-        return {
-            "id": row["id"],
-            "name": row["name"],
-            "service": row["service"],
-            "phone": row["phone"],
-            "details": row["details"],
-            "sourceUrl": row["source_url"],
-            "verifiedAt": row["verified_at"],
-        }
-
-    @staticmethod
-    def _provider(row: sqlite3.Row) -> dict:
+    def _provider(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+        average = conn.execute(
+            "SELECT AVG(rating) FROM reviews WHERE provider_id = ?", (row["id"],)
+        ).fetchone()[0]
         provider = {
             "id": row["id"],
             "name": row["name"],
             "phone": row["phone"],
-            "rating": row["rating"],
+            "rating": average if average is not None else row["rating"] or None,
             "experience": row["experience"],
             "serviceId": row["service_id"],
         }
         if row["area"]:
             provider["area"] = row["area"]
         return provider
+
+    @staticmethod
+    def _application(row: sqlite3.Row) -> dict:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "phone": row["phone"],
+            "serviceIds": json.loads(row["service_ids"]),
+            "area": row["area"],
+            "experience": row["experience"],
+            "language": row["language"],
+            "consent": bool(row["consent"]),
+            "status": row["status"],
+            "createdAt": row["created_at"],
+            "reviewedAt": row["reviewed_at"],
+        }
+
+    @staticmethod
+    def _provider_phone_conflict(conn: sqlite3.Connection, phone: str, service_ids: list[str]) -> bool:
+        placeholders = ",".join("?" for _ in service_ids)
+        for row in conn.execute(
+            f"SELECT phone FROM providers WHERE service_id IN ({placeholders})", service_ids
+        ):
+            try:
+                if normalize_india_mobile(row["phone"]) == phone:
+                    return True
+            except ValueError:
+                # Legacy manual listings may contain non-mobile contact numbers.
+                continue
+        return False
+
+    @staticmethod
+    def _services_exist(conn: sqlite3.Connection, service_ids: list[str]) -> bool:
+        return all(conn.execute("SELECT 1 FROM services WHERE id = ?", (sid,)).fetchone() for sid in service_ids)
+
+    def get_provider_applications(self) -> list[dict]:
+        with self._connect() as conn:
+            return [self._application(row) for row in conn.execute(
+                "SELECT * FROM provider_applications ORDER BY rowid DESC"
+            )]
+
+    def add_provider_application(self, application: dict) -> dict:
+        phone = normalize_india_mobile(application["phone"])
+        service_ids = application["serviceIds"]
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if not self._services_exist(conn, service_ids):
+                raise ApplicationError(422, "One or more selected services do not exist.")
+            existing = conn.execute(
+                "SELECT service_ids FROM provider_applications WHERE phone = ? AND status IN ('pending', 'approved')",
+                (phone,),
+            )
+            if any(set(service_ids).intersection(json.loads(row["service_ids"])) for row in existing):
+                raise ApplicationError(409, "An application for this phone and a selected service is already pending or approved.")
+            if self._provider_phone_conflict(conn, phone, service_ids):
+                raise ApplicationError(409, "A provider with this phone is already listed for a selected service.")
+            receipt = {"id": str(uuid4()), "status": "pending", "createdAt": _now()}
+            conn.execute(
+                "INSERT INTO provider_applications"
+                " (id, name, phone, service_ids, area, experience, language, consent, status, created_at)"
+                " VALUES (:id, :name, :phone, :service_ids, :area, :experience, :language, 1, :status, :createdAt)",
+                {**application, **receipt, "phone": phone, "service_ids": json.dumps(service_ids)},
+            )
+            return receipt
+
+    @staticmethod
+    def _pending_application(conn: sqlite3.Connection, application_id: str) -> dict:
+        row = conn.execute("SELECT * FROM provider_applications WHERE id = ?", (application_id,)).fetchone()
+        if row is None:
+            raise ApplicationError(404, "Provider application not found.")
+        if row["status"] != "pending":
+            raise ApplicationError(409, f"Provider application is already {row['status']}.")
+        return Store._application(row)
+
+    def approve_provider_application(self, application_id: str) -> dict:
+        try:
+            with self._connect() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                application = self._pending_application(conn, application_id)
+                if not self._services_exist(conn, application["serviceIds"]):
+                    raise ApplicationError(409, "Cannot approve: one or more selected services no longer exist.")
+                if self._provider_phone_conflict(conn, application["phone"], application["serviceIds"]):
+                    raise ApplicationError(409, "Cannot approve: a provider with this phone is already listed for a selected service.")
+                providers = []
+                for service_id in application["serviceIds"]:
+                    provider_id = str(uuid4())
+                    conn.execute(
+                        "INSERT INTO providers (id, service_id, name, phone, rating, experience, area)"
+                        " VALUES (?, ?, ?, ?, 0, ?, ?)",
+                        (provider_id, service_id, application["name"], application["phone"],
+                         application["experience"], application["area"]),
+                    )
+                    providers.append(self._provider(conn, conn.execute(
+                        "SELECT * FROM providers WHERE id = ?", (provider_id,)
+                    ).fetchone()))
+                application.update(status="approved", reviewedAt=_now())
+                conn.execute(
+                    "UPDATE provider_applications SET status = 'approved', reviewed_at = ? WHERE id = ?",
+                    (application["reviewedAt"], application_id),
+                )
+                return {"application": application, "providers": providers}
+        except sqlite3.IntegrityError as exc:
+            raise ApplicationError(409, "Cannot approve: provider creation failed; no changes were saved.") from exc
+
+    def reject_provider_application(self, application_id: str) -> dict:
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            application = self._pending_application(conn, application_id)
+            application.update(status="rejected", reviewedAt=_now())
+            conn.execute(
+                "UPDATE provider_applications SET status = 'rejected', reviewed_at = ? WHERE id = ?",
+                (application["reviewedAt"], application_id),
+            )
+            return application
 
     @staticmethod
     def _review(row: sqlite3.Row) -> dict:
@@ -366,31 +492,6 @@ class Store:
         with self._connect() as conn:
             return conn.execute("DELETE FROM civic_alerts WHERE id = ?", (alert_id,)).rowcount > 0
 
-    def add_emergency_contact(self, contact: dict) -> dict | None:
-        with self._connect() as conn:
-            try:
-                conn.execute(
-                    "INSERT INTO emergency_contacts (id, name, service, phone, details, source_url, verified_at)"
-                    " VALUES (:id, :name, :service, :phone, :details, :sourceUrl, :verifiedAt)",
-                    contact,
-                )
-            except sqlite3.IntegrityError:
-                return None
-        return contact
-
-    def update_emergency_contact(self, contact: dict) -> dict | None:
-        with self._connect() as conn:
-            updated = conn.execute(
-                "UPDATE emergency_contacts SET name = :name, service = :service, phone = :phone,"
-                " details = :details, source_url = :sourceUrl, verified_at = :verifiedAt WHERE id = :id",
-                contact,
-            ).rowcount
-        return contact if updated else None
-
-    def delete_emergency_contact(self, contact_id: str) -> bool:
-        with self._connect() as conn:
-            return conn.execute("DELETE FROM emergency_contacts WHERE id = ?", (contact_id,)).rowcount > 0
-
     def add_service(self, service: dict) -> dict | None:
         with self._connect() as conn:
             try:
@@ -401,6 +502,7 @@ class Store:
 
     def add_provider(self, provider: dict) -> dict | None:
         with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             if not conn.execute("SELECT 1 FROM services WHERE id = ?", (provider["serviceId"],)).fetchone():
                 return None
             duplicate = conn.execute(
@@ -409,17 +511,23 @@ class Store:
             ).fetchone()
             if duplicate:
                 return None
+            try:
+                phone = normalize_india_mobile(provider["phone"])
+            except ValueError:
+                phone = None
+            if phone and self._provider_phone_conflict(conn, phone, [provider["serviceId"]]):
+                return None
             conn.execute(
                 "INSERT INTO providers (id, service_id, name, phone, rating, experience, area) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (provider["id"], provider["serviceId"], provider["name"], provider["phone"], provider["rating"], provider["experience"], provider.get("area")),
+                (provider["id"], provider["serviceId"], provider["name"], provider["phone"], provider.get("rating") or 0, provider["experience"], provider.get("area")),
             )
-            return self._provider(conn.execute("SELECT * FROM providers WHERE id = ?", (provider["id"],)).fetchone())
+            return self._provider(conn, conn.execute("SELECT * FROM providers WHERE id = ?", (provider["id"],)).fetchone())
 
     def update_provider_area(self, provider_id: str, area: str | None) -> dict | None:
         with self._connect() as conn:
             conn.execute("UPDATE providers SET area = ? WHERE id = ?", (area or None, provider_id))
             row = conn.execute("SELECT * FROM providers WHERE id = ?", (provider_id,)).fetchone()
-            return self._provider(row) if row else None
+            return self._provider(conn, row) if row else None
 
     def delete_provider(self, provider_id: str) -> bool:
         with self._connect() as conn:

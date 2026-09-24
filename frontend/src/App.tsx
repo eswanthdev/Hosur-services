@@ -2,10 +2,16 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { hosurApi, type FeedPost, type NewsItem, type Provider, type Review, type Service } from "./api/hosur";
 import "./styles.css";
 import { Updates } from "./Updates";
+import { ProviderRegistration } from "./ProviderRegistration";
+import { ProviderApplications } from "./ProviderApplications";
 
 type UserProfile = { name: string; phone: string; address: string };
 type CustomerTab = "home" | "feed" | "updates";
 type SyncStatus = "connecting" | "online" | "offline";
+function viewFromHash(): "home" | "admin" | "register" {
+  const hash = window.location.hash.split("?")[0];
+  return hash === "#admin" ? "admin" : hash === "#register" ? "register" : "home";
+}
 
 const areas = ["Hosur Town", "Bagalur", "Bagalur Road", "Nallur", "Mathigiri", "Zuzuvadi", "SIPCOT", "Mookandapalli", "Shanthi Nagar", "Avalapalli", "Thally Road", "Attibele"];
 const loggedInUser: UserProfile = { name: "Ravi Kumar", phone: "9876543210", address: "12, 2nd Cross, SIPCOT, Hosur" };
@@ -93,7 +99,6 @@ function readStoredState() {
 
 export function App() {
   const [language, setLanguage] = useState<"en" | "ta">("en");
-  const [area, setArea] = useState(areas[0]);
   const [services, setServices] = useState<Service[]>(() => {
     const savedServices: Service[] = readStoredState()?.services ?? initialServices;
     const savedIds = new Set(savedServices.map((service) => service.id));
@@ -130,13 +135,14 @@ export function App() {
   const [query, setQuery] = useState("");
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
-  const [view, setView] = useState<"home" | "admin">(() => (typeof window !== "undefined" && window.location.hash === "#admin" ? "admin" : "home"));
+  const [view, setView] = useState(viewFromHash);
   const [customerTab, setCustomerTab] = useState<CustomerTab>("home");
   const [bookingSent, setBookingSent] = useState(false);
   const [askedFor, setAskedFor] = useState<string[]>(() => readStoredState()?.askedFor ?? []);
   const [postDraft, setPostDraft] = useState("");
   const [providerError, setProviderError] = useState("");
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("connecting");
+  const [initialStateSettled, setInitialStateSettled] = useState(false);
 
   // The backend is the source of truth; localStorage keeps the last known
   // state so the app still works (on this device only) when it is unreachable.
@@ -151,8 +157,12 @@ export function App() {
       setFeedPosts(state.feedPosts);
       setAskedFor(state.askedFor);
       setSyncStatus("online");
+      setInitialStateSettled(true);
     }, () => {
-      if (!cancelled) setSyncStatus("offline");
+      if (!cancelled) {
+        setSyncStatus("offline");
+        setInitialStateSettled(true);
+      }
     });
     return () => { cancelled = true; };
   }, []);
@@ -166,14 +176,19 @@ export function App() {
 
   useEffect(() => {
     const syncViewFromHash = () => {
-      const nextView = window.location.hash === "#admin" ? "admin" : "home";
+      const nextView = viewFromHash();
       setView(nextView);
+      if (nextView === "home" && view !== "home") {
+        setSelectedService(null);
+        setSelectedProvider(null);
+        setCustomerTab("home");
+      }
     };
 
     syncViewFromHash();
     window.addEventListener("hashchange", syncViewFromHash);
     return () => window.removeEventListener("hashchange", syncViewFromHash);
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -183,8 +198,8 @@ export function App() {
   const [reviewDraft, setReviewDraft] = useState({ name: userProfile.name, rating: 5, comment: "" });
 
   const text = language === "ta"
-    ? { brand: "ஹோசூர் சர்வீசஸ்", subtitle: "உங்கள் பகுதியில் நம்பகமான சேவைகள்", find: "சேவையைத் தேர்ந்தெடுக்கவும்", area: "உங்கள் பகுதி", book: "பதிவு செய்யுங்கள்", admin: "நிர்வாகம்" }
-    : { brand: "Hosur Services", subtitle: "Local services for your area", find: "Choose a service", area: "Your area", book: "Book a provider", admin: "Admin" };
+    ? { brand: "ஹோசூர் சர்வீசஸ்", subtitle: "ஹோசூரில் நம்பகமான சேவைகள்", find: "சேவையைத் தேர்ந்தெடுக்கவும்", book: "பதிவு செய்யுங்கள்", admin: "நிர்வாகம்" }
+    : { brand: "Hosur Services", subtitle: "Local services across Hosur", find: "Choose a service", book: "Book a provider", admin: "Admin" };
   const filtered = useMemo(() => services.filter((service) =>
     (category === "All" || service.category === category) &&
     `${service.name} ${service.tamil}`.toLowerCase().includes(query.toLowerCase()),
@@ -195,12 +210,7 @@ export function App() {
     [providerCatalog],
   );
 
-  const providersForSelectedService = useMemo(() => {
-    const providers = selectedService ? (providerCatalog[selectedService.id] ?? []) : [];
-    return [...providers].sort((first, second) =>
-      Number(second.area === area) - Number(first.area === area),
-    );
-  }, [area, providerCatalog, selectedService]);
+  const providersForSelectedService = selectedService ? (providerCatalog[selectedService.id] ?? []) : [];
   const selectedIsTutor = selectedService ? isTutorService(selectedService) : false;
   const selectedIsRental = selectedService?.category === "Renting";
   const requirementsLabel = selectedIsRental ? "Rental requirements" : selectedIsTutor ? "Lesson requirements" : "Text note";
@@ -230,7 +240,7 @@ export function App() {
     const mediaFile = form.get("mediaFile");
     const mediaName = mediaFile && typeof mediaFile !== "string" ? mediaFile.name : "";
     const problemText = details || (selectedIsRental ? "Customer wants to discuss rental dates, availability, charges and deposit." : selectedIsTutor ? "Customer wants to discuss lessons, timings and fees." : (mediaName ? "Customer attached audio/video proof for the issue." : "Customer wants to discuss the repair issue."));
-    const message = `Hi ${selectedProvider.name}, I need a ${selectedService.name.toLowerCase()} service request.\nCustomer: ${name}\nPhone: ${phone}\nArea: ${area}\nAddress: ${address}\n${selectedIsTutor || selectedIsRental ? requirementsLabel : "Problem"}: ${problemText}${mediaName ? `\nAttachment: ${mediaName}` : ""}`;
+    const message = `Hi ${selectedProvider.name}, I need a ${selectedService.name.toLowerCase()} service request.\nCustomer: ${name}\nPhone: ${phone}\nAddress: ${address}\n${selectedIsTutor || selectedIsRental ? requirementsLabel : "Problem"}: ${problemText}${mediaName ? `\nAttachment: ${mediaName}` : ""}`;
     const whatsappUrl = `https://wa.me/${selectedProvider.phone}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
     setBookingSent(true);
@@ -278,7 +288,6 @@ export function App() {
     const phone = String(form.get("providerPhone") ?? "").trim();
     const experience = String(form.get("providerExperience") ?? "").trim();
     const providerArea = String(form.get("providerArea") ?? "");
-    const ratingValue = Number(form.get("providerRating") ?? 5);
     if (!serviceId || !name || !phone || !experience) return;
     if (!areas.includes(providerArea)) {
       setProviderError("Choose a valid area for the provider.");
@@ -299,7 +308,7 @@ export function App() {
       id: `${serviceId}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`,
       name,
       phone: normalizedPhone,
-      rating: Number.isFinite(ratingValue) ? Math.min(5, Math.max(1, ratingValue)) : 5,
+      rating: null,
       experience,
       serviceId,
       area: providerArea,
@@ -385,7 +394,7 @@ export function App() {
       id: `feed-${Date.now()}`,
       author: userProfile.name,
       handle: `@${userProfile.name.toLowerCase().replace(/\s+/g, "")}`,
-      location: area,
+      location: "Hosur",
       title: "Community update",
       caption: text,
       accent: "linear-gradient(135deg, #facc15 0%, #fb7185 35%, #60a5fa 100%)",
@@ -423,20 +432,41 @@ export function App() {
     return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
   }
 
+  function providerRatingLabel(providerId: string) {
+    const reviews = reviewsByProvider[providerId] ?? [];
+    if (!reviews.length) return language === "ta" ? "புதிய சேவை வழங்குநர் - மதிப்புரைகள் இல்லை" : "New provider - no reviews yet";
+    const average = reviews.reduce((total, review) => total + review.rating, 0) / reviews.length;
+    return `★ ${average.toFixed(1)} (${reviews.length} ${language === "ta" ? "மதிப்புரைகள்" : reviews.length === 1 ? "review" : "reviews"})`;
+  }
+
+  function publishApprovedProviders(providers: Provider[]) {
+    setProviderCatalog((current) => {
+      const next = { ...current };
+      for (const provider of providers) {
+        next[provider.serviceId] = [...(next[provider.serviceId] ?? []).filter((item) => item.id !== provider.id), provider];
+      }
+      return next;
+    });
+  }
+
+  if (view === "register") return <ProviderRegistration />;
+
   if (view === "admin") {
     return <main className="app-shell">
       <header className="topbar"><button className="brand" onClick={openCustomerView}>{text.brand}</button><button className="text-button" onClick={openCustomerView}>← Customer view</button></header>
       <section className="admin-page">
         <p className="eyebrow">FOUNDER DESK</p><h1>Start with verified providers.</h1>
         <p className="intro">Only approved providers appear in the customer portal. Add the verified details here and they will instantly become available for booking.</p>
-        {syncStatus === "offline" && <p className="sync-warning" role="status">Cannot reach the Hosur Services server. Changes are saved on this device only and will not be shown to customers. All entries in Manage local updates require a server connection to save.</p>}
+        {syncStatus === "offline" && <p className="sync-warning" role="status">Cannot reach the Hosur Services server. Manual catalogue changes are saved on this device only and will not be shown to customers. Provider applications, approvals and local updates require a server connection to save.</p>}
         <div className="stat-grid"><article><strong>{liveProviders.length}</strong><span>Live providers</span></article><article><strong>{askedFor.length}</strong><span>Bookings requested</span></article><article><strong>{services.length}</strong><span>Active services</span></article></div>
+
+        <ProviderApplications services={services} onApproved={publishApprovedProviders} readyToApprove={initialStateSettled} />
 
         <section className="admin-card"><h2>Add a service</h2><form onSubmit={addService} className="add-service"><label>Service name<input required name="name" placeholder="e.g. Curtain fitting" /></label><label>Category<select required name="category"><option value="">Choose category</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></label><button className="primary">Add service</button></form></section>
 
         <section className="admin-card"><h2>Add local news alert</h2><form onSubmit={addNewsItem} className="news-form"><label>Badge<input required name="newsBadge" placeholder="Water alert" /></label><label>Area<input required name="newsArea" placeholder="Attibele" /></label><label>Title<input required name="newsTitle" placeholder="Pipeline maintenance in Attibele" /></label><label>Summary<textarea required name="newsSummary" placeholder="Describe the local issue or update" /></label><button className="primary">Add city alert</button></form></section>
 
-        <section className="admin-card"><h2>Add a verified provider</h2><form onSubmit={addProvider} className="add-service"><label>Service<select required name="providerService"><option value="">Choose service</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label><label>Provider name<input required name="providerName" placeholder="e.g. Karthik Plumbing" /></label><label>Phone number<input required name="providerPhone" placeholder="9876543210" inputMode="tel" /></label><label>Experience<input required name="providerExperience" placeholder="8 years" /></label><label>Provider area<select required name="providerArea" defaultValue=""><option value="">Choose area</option>{areas.map((item) => <option key={item}>{item}</option>)}</select></label><label>Rating<select required name="providerRating" defaultValue={5}><option value={5}>5.0</option><option value={4.9}>4.9</option><option value={4.8}>4.8</option><option value={4.7}>4.7</option><option value={4.6}>4.6</option></select></label><button className="primary">Save verified provider</button></form>{providerError && <p role="alert">{providerError}</p>}</section>
+        <section className="admin-card"><h2>Add a verified provider</h2><form onSubmit={addProvider} className="add-service"><label>Service<select required name="providerService"><option value="">Choose service</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label><label>Provider name<input required name="providerName" placeholder="e.g. Karthik Plumbing" /></label><label>Phone number<input required name="providerPhone" placeholder="9876543210" inputMode="tel" /></label><label>Experience<input required name="providerExperience" placeholder="8 years" /></label><label>Provider area<select required name="providerArea" defaultValue=""><option value="">Choose area</option>{areas.map((item) => <option key={item}>{item}</option>)}</select></label><button className="primary">Save verified provider</button></form>{providerError && <p role="alert">{providerError}</p>}</section>
 
         <section className="admin-card">
           <div className="admin-card-header">
@@ -461,12 +491,13 @@ export function App() {
                       <label className="provider-area">Area
                         <select aria-label={`Area for ${provider.name}`} value={provider.area ?? ""} onChange={(event) => updateProviderArea(provider.id, event.target.value)}>
                           <option value="">Area not set</option>
+                          {provider.area && !areas.includes(provider.area) && <option value={provider.area}>{provider.area}</option>}
                           {areas.map((item) => <option key={item}>{item}</option>)}
                         </select>
                       </label>
                     </div>
                     <span>{serviceName}</span>
-                    <span>★ {provider.rating.toFixed(1)}</span>
+                    <span>{providerRatingLabel(provider.id)}</span>
                     <span>{provider.phone}</span>
                     <button className="danger-button" type="button" onClick={() => removeProvider(provider.id)}>Remove</button>
                   </div>
@@ -478,7 +509,7 @@ export function App() {
           )}
         </section>
 
-        <Updates admin areas={areas} area={area} onAreaChange={setArea} language={language} />
+        <Updates admin areas={areas} language={language} />
         <section className="admin-card"><h2>Asked-for list</h2>{askedFor.length ? <ul>{askedFor.map((item) => <li key={item}>{item}</li>)}</ul> : <p>No unmatched searches recorded yet.</p>}</section>
       </section>
     </main>;
@@ -501,7 +532,7 @@ export function App() {
       </header>
 
       {!selectedService ? (
-        customerTab === "updates" ? <Updates areas={areas} area={area} onAreaChange={setArea} language={language} /> : customerTab === "feed" ? (
+        customerTab === "updates" ? <Updates areas={areas} language={language} /> : customerTab === "feed" ? (
           <section className="instagram-page">
             <div className="instagram-shell">
               <div className="instagram-header">
@@ -576,14 +607,24 @@ export function App() {
                   <p className="eyebrow">HOSUR • LOCAL • DIRECT</p>
                   <h1>{text.subtitle}</h1>
                   <p>From quick fixes to new skills, find your local expert right here in Hosur.</p>
-                  <label className="area-picker">{text.area}<select value={area} onChange={(event) => setArea(event.target.value)}>{areas.map((item) => <option key={item}>{item}</option>)}</select></label>
                 </div>
               </div>
             </section>
 
             <section className="services">
+              <aside className="provider-invite">
+                <div>
+                  <strong>{language === "ta" ? "ஹோசூரில் சேவை வழங்குகிறீர்களா?" : "Offer a service in Hosur?"}</strong>
+                  <nav className="provider-invite-languages" aria-label="Register in your language">
+                    <a lang="ta" href="#register?lang=ta">தமிழில் பதிவு செய்ய</a>
+                    <a lang="te" href="#register?lang=te">తెలుగులో నమోదు చేసుకోండి</a>
+                    <a lang="kn" href="#register?lang=kn">ಕನ್ನಡದಲ್ಲಿ ನೋಂದಾಯಿಸಿ</a>
+                  </nav>
+                </div>
+                <a className="primary" href={`#register?lang=${language}`}>{language === "ta" ? "சேவை வழங்குநராகப் பதிவு செய்யுங்கள்" : "Register as a service provider"}</a>
+              </aside>
               <div className="section-title">
-                <div><p className="eyebrow">{area.toUpperCase()}</p><h2>{text.find}</h2></div>
+                <div><p className="eyebrow">HOSUR</p><h2>{text.find}</h2></div>
                 <input aria-label="Search services" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a service" />
               </div>
               <div className="chips">
@@ -613,17 +654,11 @@ export function App() {
       ) : (
         <section className="booking-page">
           <button className="back" onClick={() => { setSelectedService(null); setSelectedProvider(null); setBookingSent(false); }}>← All services</button>
-          <label className="area-picker" style={{ marginBottom: 18 }}>
-            {text.area}
-            <select value={area} onChange={(event) => setArea(event.target.value)}>
-              {areas.map((item) => <option key={item}>{item}</option>)}
-            </select>
-          </label>
-          <p className="eyebrow">{selectedService.category.toUpperCase()} · {area.toUpperCase()}</p>
+          <p className="eyebrow">{selectedService.category.toUpperCase()} · HOSUR</p>
           <h1>{language === "en" ? selectedService.name : selectedService.tamil}</h1>
-          <p className="intro">{selectedIsRental ? "Contact a rental provider to confirm equipment, dates, availability, rental charges, deposit and pickup or delivery arrangements." : selectedIsTutor ? "Contact an approved tutor or coach to discuss age groups, lesson location, timings and fees before booking." : "Providers choose their own visit charge, job prices, and hourly rates. Phone numbers are shared only after a provider accepts your request."}</p>
+          <p className="intro">{selectedIsRental ? "Contact a rental provider to confirm equipment, dates, availability, rental charges, deposit and pickup or delivery arrangements." : selectedIsTutor ? "Contact an approved tutor or coach to discuss age groups, lesson location, timings and fees before booking." : "Providers choose their own visit charge, job prices, and hourly rates. Contact a provider on WhatsApp to discuss your request."}</p>
           {!selectedProvider && providersForSelectedService.length > 0 && (
-            <p className="fine-print">{language === "ta" ? `${area} பகுதியில் உள்ளவர்கள் முதலில் காட்டப்படுவார்கள்; மற்ற பகுதிகளில் உள்ளவர்களும் கீழே உள்ளனர்.` : `Providers based in ${area} appear first. Providers from other areas are also listed below.`}</p>
+            <p className="fine-print">{language === "ta" ? "அனைத்துப் பகுதிகளின் சேவை வழங்குநர்களும் இங்கே உள்ளனர். உங்கள் முகவரியில் சேவை கிடைக்குமா என்பதை உறுதிப்படுத்தவும்." : "Providers from all areas are listed here. Confirm service availability at your address before booking."}</p>
           )}
 
           {!bookingSent ? (
@@ -633,18 +668,18 @@ export function App() {
                   {providersForSelectedService.length ? providersForSelectedService.map((provider) => (
                     <article className="provider-card" key={provider.id}>
                       <div className="provider-top">
-                        <div><h2>{provider.name}</h2><p>{provider.experience} experience</p></div>
-                        <span className="rating">★ {provider.rating.toFixed(1)}</span>
+                        <div><h2>{provider.name}</h2><p>{provider.experience || (language === "ta" ? "அனுபவம் குறிப்பிடப்படவில்லை" : "Experience not provided")}</p></div>
+                        <span className="rating">{providerRatingLabel(provider.id)}</span>
                       </div>
-                      <div className="provider-meta"><span>{provider.area || (language === "ta" ? "பகுதி குறிப்பிடப்படவில்லை" : "Area not set")}</span><span>Verified local</span></div>
+                      <div className="provider-meta"><span>{provider.area ? (language === "ta" ? `இருப்பிடம்: ${provider.area}` : `Based in: ${provider.area}`) : (language === "ta" ? "பகுதி குறிப்பிடப்படவில்லை" : "Location not provided")}</span><span>Verified local</span></div>
                       <button className="primary" type="button" onClick={() => handleBookProvider(provider)}>Book {provider.name}</button>
                     </article>
                   )) : (
                     <section className="no-providers">
                       <span>!</span>
                       <div>
-                        <h2>{selectedIsTutor ? `No approved tutors or coaches are listed for ${selectedService.name} yet.` : `No verified providers are live in ${area} yet.`}</h2>
-                        <p>{selectedIsTutor ? "Please check back after an approved tutor or coach has been added." : "Your request will be recorded for the founder to match when an approved provider is available."}</p>
+                        <h2>{selectedIsTutor ? `No approved tutors or coaches are listed for ${selectedService.name} yet.` : `No verified providers are listed for ${selectedService.name} yet.`}</h2>
+                        {selectedIsTutor && <p>Please check back after an approved tutor or coach has been added.</p>}
                       </div>
                     </section>
                   )}
@@ -655,7 +690,7 @@ export function App() {
                     <h2>Book {selectedProvider.name}</h2>
                     <label>Your name<input readOnly name="name" defaultValue={userProfile.name} /></label>
                     <label>Phone number<input readOnly name="phone" inputMode="tel" defaultValue={userProfile.phone} pattern="[0-9]{10}" /></label>
-                    <label>Address in {area}<textarea readOnly name="address" defaultValue={userProfile.address} /></label>
+                    <label>Service address<textarea required name="address" defaultValue={userProfile.address} /></label>
                     <label className="upload-field"><span>{selectedIsRental ? "Rental details (optional attachment)" : selectedIsTutor ? "Learning goals (optional attachment)" : "Describe the problem"}</span><input type="file" name="mediaFile" accept="audio/*,video/*,.txt,.doc,.docx" /></label>
                     <label>{requirementsLabel}<textarea name="details" placeholder={selectedIsRental ? "Equipment or model, quantity, rental dates and pickup or delivery preference" : selectedIsTutor ? "Learner's age, experience level, preferred timings and learning goals" : "Describe the issue in text, or attach audio/video above"} /></label>
                     <button className="primary" type="submit">Send WhatsApp request</button>

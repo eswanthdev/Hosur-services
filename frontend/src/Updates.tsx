@@ -4,9 +4,9 @@ import { CivicUpdates } from "./CivicUpdates";
 import { formatUpdateTime, inputTime, UpdateVerification, VerificationFields } from "./UpdateDetails";
 import "./updates.css";
 
-type Props = { admin?: boolean; areas: string[]; area: string; onAreaChange: (area: string) => void; language: "en" | "ta" };
+type Props = { admin?: boolean; areas: string[]; language: "en" | "ta" };
 
-export function Updates({ admin = false, areas, area, onAreaChange, language }: Props) {
+export function Updates({ admin = false, areas, language }: Props) {
   const [data, setData] = useState<LocalUpdates | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -92,19 +92,16 @@ export function Updates({ admin = false, areas, area, onAreaChange, language }: 
 
   const shutdowns = (data?.shutdowns ?? []).filter((item) => admin || new Date(item.endsAt).getTime() > now)
     .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
-  const stations = (data?.chargingStations ?? []).filter((item) => admin || item.area === area)
+  const stations = [...(data?.chargingStations ?? [])]
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return <section className={admin ? "updates-admin" : "updates-page"}>
     <div className="updates-intro">
       <p className="eyebrow">{t("KNOW YOUR NEIGHBOURHOOD", "உங்கள் பகுதியின் தகவல்கள்")}</p>
       <h1>{admin ? "Manage local updates" : t("Hosur Updates", "ஹோசூர் அறிவிப்புகள்")}</h1>
-      <p>{t("Power, water, traffic and waste notices, EV charging stations and emergency contacts, checked and published by the admin.", "மின்தடை, குடிநீர், போக்குவரத்து, குப்பை சேகரிப்பு அறிவிப்புகள், மின்வாகன சார்ஜிங் நிலையங்கள் மற்றும் அவசர தொடர்புகள். நிர்வாகியால் சரிபார்க்கப்பட்ட தகவல்கள்.")}</p>
-      {!admin && <label className="area-picker">{t("Local area", "உங்கள் பகுதி")}
-        <select value={area} onChange={(event) => onAreaChange(event.target.value)}>{areas.map((name) => <option key={name}>{name}</option>)}</select>
-      </label>}
-      {!admin && <p>{t("Area selection filters water supply, waste collection and charging stations only. Power notices and emergency contacts cover all areas; traffic can be filtered by route.", "பகுதி தேர்வு குடிநீர், குப்பை சேகரிப்பு மற்றும் சார்ஜிங் நிலையங்களுக்கு மட்டும் பொருந்தும். மின்தடை அறிவிப்புகள் மற்றும் அவசர தொடர்புகள் அனைத்துப் பகுதிகளுக்கும் காட்டப்படும். போக்குவரத்தை வழித்தடம் மூலம் தேர்ந்தெடுக்கலாம்.")}</p>}
-      <p className="updates-disclaimer">{t("Not a live status feed. Schedules and contact details can change; check the source before relying on a listing. All notice times are in IST.", "இது நேரடி தகவல் அல்ல. நேரங்களும் தொடர்பு விவரங்களும் மாறலாம்; ஆதாரத்தைச் சரிபார்க்கவும். நேரங்கள் இந்திய நேரப்படி.")}</p>
+      <p>{t("Power, water, traffic and waste notices, and EV charging stations, checked and published by the admin.", "மின்தடை, குடிநீர், போக்குவரத்து, குப்பை சேகரிப்பு அறிவிப்புகள் மற்றும் மின்வாகன சார்ஜிங் நிலையங்கள். நிர்வாகியால் சரிபார்க்கப்பட்ட தகவல்கள்.")}</p>
+      {!admin && <p>{t("Updates from across Hosur. Locations and affected routes are shown on each listing.", "ஹோசூரின் அனைத்துப் பகுதிகளின் அறிவிப்புகள். இடங்கள் மற்றும் பாதிக்கப்பட்ட வழித்தடங்கள் ஒவ்வொரு பதிவிலும் காட்டப்படும்.")}</p>}
+      <p className="updates-disclaimer">{t("Not a live status feed. Schedules can change; check the source before relying on a listing. All notice times are in IST.", "இது நேரடி தகவல் அல்ல. நேரங்கள் மாறலாம்; ஆதாரத்தைச் சரிபார்க்கவும். நேரங்கள் இந்திய நேரப்படி.")}</p>
     </div>
     {error && <p className="sync-warning" role="alert">{error} {!data && <button type="button" className="secondary" onClick={() => setReload((value) => value + 1)}>{t("Retry", "மீண்டும் முயற்சி")}</button>}</p>}
     {message && <p role="status">{message}</p>}
@@ -165,7 +162,7 @@ export function Updates({ admin = false, areas, area, onAreaChange, language }: 
         <section aria-label={t("EV charging stations", "மின்வாகன சார்ஜிங் நிலையங்கள்")}>
           <h2>{t("EV charging stations", "மின்வாகன சார்ஜிங் நிலையங்கள்")} <span className="update-count">{stations.length}</span></h2>
           <p>{t("Confirm connector compatibility, pricing and availability with the operator before travelling.", "பயணிக்கும் முன் இணைப்பான் பொருத்தம், கட்டணம் மற்றும் கிடைக்கும் தன்மையை நிலைய நிர்வாகியிடம் உறுதிப்படுத்தவும்.")}</p>
-          {!stations.length && <p className="update-empty">{t("No verified charging stations listed for this area yet. Try another area.", "இந்த பகுதியில் சரிபார்க்கப்பட்ட சார்ஜிங் நிலையங்கள் இன்னும் பட்டியலிடப்படவில்லை. வேறு பகுதியைத் தேர்ந்தெடுக்கவும்.")}</p>}
+          {!stations.length && <p className="update-empty">{t("No verified charging stations listed yet.", "சரிபார்க்கப்பட்ட சார்ஜிங் நிலையங்கள் இன்னும் பட்டியலிடப்படவில்லை.")}</p>}
           {stations.map((item) => <article className="update-card" key={item.id}>
             <span className="update-badge charging-badge">{item.area}</span><h3>{item.name}</h3><p>{item.address}</p>
             <dl><dt>{t("Connectors / power", "இணைப்பான்கள் / திறன்")}</dt><dd>{item.connectors}</dd><dt>{t("Opening hours", "திறந்திருக்கும் நேரம்")}</dt><dd>{item.hours}</dd></dl>
@@ -184,12 +181,10 @@ export function Updates({ admin = false, areas, area, onAreaChange, language }: 
           </article>)}
         </section>
       </div>
-      <CivicUpdates admin={admin} areas={areas} area={area} language={language} now={now}
-        alerts={data.civicAlerts} contacts={data.emergencyContacts} saving={saving} persist={persist} onError={setError}
+      <CivicUpdates admin={admin} areas={areas} language={language} now={now}
+        alerts={data.civicAlerts} saving={saving} persist={persist} onError={setError}
         onAlertSaved={(saved) => setData((previous) => previous && { ...previous, civicAlerts: [...previous.civicAlerts.filter((item) => item.id !== saved.id), saved] })}
         onAlertRemoved={(id) => setData((previous) => previous && { ...previous, civicAlerts: previous.civicAlerts.filter((item) => item.id !== id) })}
-        onContactSaved={(saved) => setData((previous) => previous && { ...previous, emergencyContacts: [...previous.emergencyContacts.filter((item) => item.id !== saved.id), saved] })}
-        onContactRemoved={(id) => setData((previous) => previous && { ...previous, emergencyContacts: previous.emergencyContacts.filter((item) => item.id !== id) })}
       />
     </>}
   </section>;

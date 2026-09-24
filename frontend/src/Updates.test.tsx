@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Updates } from "./Updates";
 import { App } from "./App";
-import type { ChargingStation, CivicAlert, CivicCategory, EmergencyContact, LocalUpdates, PowerShutdown } from "./api/hosur";
+import type { ChargingStation, CivicAlert, CivicCategory, LocalUpdates, PowerShutdown } from "./api/hosur";
 
 const shutdown: PowerShutdown = {
   id: "shutdown-1", title: "Test maintenance", areas: ["Hosur Town", "SIPCOT"],
@@ -13,15 +13,11 @@ const station: ChargingStation = {
   id: "station-1", name: "Test charging station", area: "Hosur Town", address: "Test address",
   connectors: "CCS2 60 kW", hours: "09:00 to 18:00", sourceUrl: "https://example.com/station", verifiedAt: "2026-01-01",
 };
-const props = { areas: ["Hosur Town", "SIPCOT", "Bagalur"], area: "Hosur Town", onAreaChange: vi.fn(), language: "en" as const };
+const props = { areas: ["Hosur Town", "SIPCOT", "Bagalur"], language: "en" as const };
 const civicAlert: CivicAlert = {
   id: "water-1", category: "water", title: "Test water supply notice", areas: ["Hosur Town"], route: "",
   message: "Test timings and affected streets", startsAt: "2099-09-24T09:00:00+05:30", expiresAt: "2099-09-24T17:00:00+05:30",
   sourceUrl: "https://example.com/water", verifiedAt: "2026-01-01",
-};
-const emergencyContact: EmergencyContact = {
-  id: "contact-1", name: "Test emergency desk", service: "Test service", phone: "+91 00000 00000",
-  details: "Test contact only; not a real emergency number", sourceUrl: "https://example.com/contact", verifiedAt: "2026-01-01",
 };
 
 function response(body: unknown, status = 200) {
@@ -29,7 +25,7 @@ function response(body: unknown, status = 200) {
 }
 
 function backend(initial: Partial<LocalUpdates>) {
-  const state: LocalUpdates = { shutdowns: [], chargingStations: [], civicAlerts: [], emergencyContacts: [], ...structuredClone(initial) };
+  const state: LocalUpdates = { shutdowns: [], chargingStations: [], civicAlerts: [], ...structuredClone(initial) };
   const fetch = vi.fn(async (path: string, init?: RequestInit) => {
     if (path === "/api/updates") return response(state);
     if (path === "/api/state") return response({ services: [], providerCatalog: {}, reviewsByProvider: {}, newsItems: [], feedPosts: [], askedFor: [] });
@@ -60,15 +56,6 @@ function backend(initial: Partial<LocalUpdates>) {
       state.civicAlerts = [...state.civicAlerts.filter((entry) => entry.id !== item.id), item];
       return response(item);
     }
-    if (path.startsWith("/api/emergency-contacts")) {
-      if (init?.method === "DELETE") {
-        state.emergencyContacts = state.emergencyContacts.filter((item) => !path.endsWith(item.id));
-        return response(null, 204);
-      }
-      const item: EmergencyContact = JSON.parse(String(init?.body));
-      state.emergencyContacts = [...state.emergencyContacts.filter((entry) => entry.id !== item.id), item];
-      return response(item);
-    }
     throw new Error(`Unexpected request: ${path}`);
   });
   vi.stubGlobal("fetch", fetch);
@@ -87,37 +74,28 @@ afterEach(() => {
 });
 
 describe("local updates", () => {
-  it("shows shutdowns across all areas while filtering stations, excluding expired notices and showing source links", async () => {
+  it("shows shutdowns and stations from all areas with locations and sources, excluding expired notices", async () => {
     backend({
       shutdowns: [shutdown, { ...shutdown, id: "past", title: "Expired maintenance", startsAt: "2020-01-01T09:00:00+05:30", endsAt: "2020-01-01T17:00:00+05:30" }],
       chargingStations: [station, { ...station, id: "other", name: "SIPCOT charger", area: "SIPCOT" }],
     });
-    const view = render(<Updates {...props} />);
+    render(<Updates {...props} />);
     expect(await screen.findByRole("heading", { name: shutdown.title })).toBeTruthy();
     expect(screen.queryByText("Expired maintenance")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "SIPCOT charger" })).toBeNull();
-    expect(screen.getAllByRole("link", { name: "View source" })).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "Find on map" }).getAttribute("href")).toContain(encodeURIComponent("Test charging station, Test address, Hosur Town, Hosur"));
-    expect(screen.getByText(/17:00|5:00/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Local area"), { target: { value: "SIPCOT" } });
-    expect(props.onAreaChange).toHaveBeenCalledWith("SIPCOT");
-    view.rerender(<Updates {...props} area="SIPCOT" />);
-    expect(screen.getByRole("heading", { name: shutdown.title })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "SIPCOT charger" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: station.name })).toBeNull();
-    view.rerender(<Updates {...props} area="Bagalur" />);
-    expect(screen.getByRole("heading", { name: shutdown.title })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: station.name })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: "View source" })).toHaveLength(3);
+    expect(screen.getAllByRole("link", { name: "Find on map" }).map((link) => link.getAttribute("href"))).toContain(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Test charging station, Test address, Hosur Town, Hosur")}`);
+    expect(screen.getByText(/17:00|5:00/)).toBeTruthy();
     expect(screen.getByText("Hosur Town, SIPCOT")).toBeTruthy();
-    expect(screen.queryByText("Expired maintenance")).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.queryByText(/No upcoming verified/)).toBeNull();
-    expect(screen.queryByRole("heading", { name: "SIPCOT charger" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: station.name })).toBeNull();
-    expect(screen.getByText(/No verified charging stations/)).toBeTruthy();
+    expect(screen.queryByText(/No verified charging stations/)).toBeNull();
   });
 
   it("shows failed loading distinctly from empty data and retries", async () => {
     const fetch = vi.fn().mockRejectedValueOnce(new TypeError("Network unavailable"))
-      .mockResolvedValueOnce(response({ shutdowns: [], chargingStations: [], civicAlerts: [], emergencyContacts: [] }));
+      .mockResolvedValueOnce(response({ shutdowns: [], chargingStations: [], civicAlerts: [] }));
     vi.stubGlobal("fetch", fetch);
     render(<Updates {...props} />);
     expect(await screen.findByRole("alert")).toBeTruthy();
@@ -133,21 +111,25 @@ describe("local updates", () => {
     render(<Updates {...props} />);
     expect((await screen.findByRole("alert")).textContent).toContain("Could not load updates");
     expect(screen.queryByText(/No upcoming verified/)).toBeNull();
-    expect(screen.queryByRole("region", { name: "Emergency contacts" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Water supply" })).toBeNull();
   });
 
   it("opens the Updates tab and supports Tamil without changing Home or Feed navigation", async () => {
     backend({ shutdowns: [], chargingStations: [] });
     render(<App />);
+    expect(screen.queryByRole("combobox")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Updates" }));
     expect(await screen.findByRole("heading", { name: "Hosur Updates" })).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.getByRole("button", { name: "Updates" }).getAttribute("aria-current")).toBe("page");
     fireEvent.click(screen.getByRole("button", { name: "தமிழ்" }));
     expect(await screen.findByRole("heading", { name: "ஹோசூர் அறிவிப்புகள்" })).toBeTruthy();
     expect(await screen.findByRole("region", { name: "குடிநீர் விநியோகம்" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "அவசர தொடர்புகள்" })).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("region", { name: "அவசர தொடர்புகள்" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Feed" }));
     expect(screen.getByRole("heading", { name: "Hosur Community Feed" })).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Home" }));
     expect(screen.queryByRole("heading", { name: "Hosur Community Feed" })).toBeNull();
   });
@@ -237,8 +219,8 @@ describe("local updates", () => {
   });
 });
 
-describe("community notices and emergency directory", () => {
-  it("filters water and waste by area, traffic by route, and keeps emergency contacts general", async () => {
+describe("community notices", () => {
+  it("shows water, waste and traffic notices across all locations without area or route filtering", async () => {
     backend({
       civicAlerts: [
         civicAlert,
@@ -247,24 +229,18 @@ describe("community notices and emergency directory", () => {
         { ...civicAlert, id: "traffic-b", category: "traffic", title: "Test diversion", areas: [], route: "Test route B" },
         { ...civicAlert, id: "expired", title: "Expired water notice", startsAt: "2020-01-01T09:00:00+05:30", expiresAt: "2020-01-01T17:00:00+05:30" },
       ],
-      emergencyContacts: [emergencyContact],
     });
-    const view = render(<Updates {...props} />);
+    render(<Updates {...props} />);
     expect(await screen.findByRole("heading", { name: civicAlert.title })).toBeTruthy();
     expect(screen.queryByText("Expired water notice")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Test waste collection" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Test waste collection" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Test road closure" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Test diversion" })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Traffic route"), { target: { value: "Test route B" } });
-    expect(screen.queryByRole("heading", { name: "Test road closure" })).toBeNull();
-    expect(screen.getByRole("heading", { name: "Test diversion" })).toBeTruthy();
-    view.rerender(<Updates {...props} area="SIPCOT" />);
-    expect(screen.queryByRole("heading", { name: civicAlert.title })).toBeNull();
-    expect(screen.getByRole("heading", { name: "Test waste collection" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Test diversion" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: emergencyContact.name })).toBeTruthy();
-    expect(screen.getByRole("link", { name: `Call ${emergencyContact.phone}` }).getAttribute("href")).toBe("tel:+910000000000");
-    expect(within(screen.getByRole("region", { name: "Emergency contacts" })).getByRole("link", { name: "View source" }).getAttribute("href")).toBe(emergencyContact.sourceUrl);
+    expect(screen.getByText("Test route A")).toBeTruthy();
+    expect(screen.getByText("Test route B")).toBeTruthy();
+    expect(screen.getByText("SIPCOT")).toBeTruthy();
+    expect(screen.getByText("Hosur Town")).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 
   it("automatically removes a notice when it expires while the page stays open", async () => {
@@ -312,30 +288,21 @@ describe("community notices and emergency directory", () => {
     expect(state.civicAlerts).toEqual([]);
   });
 
-  it("publishes, edits and removes verified emergency contacts", async () => {
-    const { state } = backend({});
-    const view = render(<Updates {...props} admin />);
-    const form = within(await screen.findByRole("form", { name: "Emergency contact form" }));
-    for (const [label, value] of [
-      ["Contact name", emergencyContact.name], ["Emergency service", emergencyContact.service], ["Phone / helpline", emergencyContact.phone],
-      ["Contact details", emergencyContact.details], ["Source URL", emergencyContact.sourceUrl], ["Last verified date", emergencyContact.verifiedAt],
-    ]) fireEvent.change(form.getByLabelText(label), { target: { value } });
-    fireEvent.click(form.getByLabelText("I have checked these details against the source."));
-    fireEvent.click(form.getByRole("button", { name: "Save emergency contact" }));
-    expect(await screen.findByRole("heading", { name: emergencyContact.name })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: `Edit ${emergencyContact.name}` }));
-    const editor = within(screen.getByRole("form", { name: "Emergency contact form" }));
-    fireEvent.change(editor.getByLabelText("Contact details"), { target: { value: "Updated test coverage" } });
-    fireEvent.click(editor.getByLabelText("I have checked these details against the source."));
-    fireEvent.click(editor.getByRole("button", { name: "Save emergency contact" }));
-    await waitFor(() => expect(state.emergencyContacts[0].details).toBe("Updated test coverage"));
-    view.unmount();
-    render(<Updates {...props} admin />);
-    expect(await screen.findByText("Updated test coverage")).toBeTruthy();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    fireEvent.click(screen.getByRole("button", { name: `Remove ${emergencyContact.name}` }));
-    await waitFor(() => expect(screen.queryByRole("heading", { name: emergencyContact.name })).toBeNull());
-    expect(state.emergencyContacts).toEqual([]);
+  it("omits emergency contacts and their admin form while keeping the other updates available", async () => {
+    backend({ shutdowns: [shutdown], chargingStations: [station], civicAlerts: [civicAlert] });
+    const view = render(<Updates {...props} />);
+    expect(await screen.findByRole("heading", { name: civicAlert.title })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: shutdown.title })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: station.name })).toBeTruthy();
+    expect(screen.getAllByRole("region")).toHaveLength(5);
+    expect(screen.queryByText(/emergency/i)).toBeNull();
+    expect(view.container.querySelector('a[href^="tel:"]')).toBeNull();
+    view.rerender(<Updates {...props} admin />);
+    expect(screen.getByRole("form", { name: "Community notice form" })).toBeTruthy();
+    expect(screen.getByRole("form", { name: "Power shutdown form" })).toBeTruthy();
+    expect(screen.getByRole("form", { name: "Charging station form" })).toBeTruthy();
+    expect(screen.queryByRole("form", { name: "Emergency contact form" })).toBeNull();
+    expect(screen.queryByText(/emergency/i)).toBeNull();
   });
 
   it("retains form input and avoids publishing when the server rejects a notice", async () => {
@@ -353,8 +320,8 @@ describe("community notices and emergency directory", () => {
     expect(screen.queryByText("Saved to the server.")).toBeNull();
   });
 
-  it("validates notice expiry, area, route and contact phone before sending writes", async () => {
-    const { fetch } = backend({ civicAlerts: [civicAlert], emergencyContacts: [emergencyContact] });
+  it("validates notice expiry, area and route before sending writes", async () => {
+    const { fetch } = backend({ civicAlerts: [civicAlert] });
     render(<Updates {...props} admin />);
     fireEvent.click(await screen.findByRole("button", { name: `Edit ${civicAlert.title}` }));
     const formElement = screen.getByRole("form", { name: "Community notice form" });
@@ -369,17 +336,12 @@ describe("community notices and emergency directory", () => {
     fireEvent.change(form.getByLabelText("Notice category"), { target: { value: "traffic" } });
     fireEvent.submit(formElement);
     expect(screen.getByRole("alert").textContent).toContain("affected road or route");
-    fireEvent.click(screen.getByRole("button", { name: `Edit ${emergencyContact.name}` }));
-    const contactForm = screen.getByRole("form", { name: "Emergency contact form" });
-    fireEvent.change(within(contactForm).getByLabelText("Phone / helpline"), { target: { value: "invalid-number" } });
-    fireEvent.submit(contactForm);
-    expect(screen.getByRole("alert").textContent).toContain("valid phone number");
     expect(fetch.mock.calls.some(([, init]) => init?.method === "POST" || init?.method === "PUT")).toBe(false);
   });
 
   it("keeps expired notices available for admin management", async () => {
     backend({ civicAlerts: [{ ...civicAlert, startsAt: "2020-01-01T09:00:00+05:30", expiresAt: "2020-01-01T17:00:00+05:30" }] });
-    render(<Updates {...props} admin area="Bagalur" />);
+    render(<Updates {...props} admin />);
     expect(await screen.findByRole("heading", { name: civicAlert.title })).toBeTruthy();
     expect(screen.getByText("Expired notice")).toBeTruthy();
     expect(screen.getByRole("button", { name: `Edit ${civicAlert.title}` })).toBeTruthy();

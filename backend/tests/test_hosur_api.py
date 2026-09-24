@@ -139,27 +139,13 @@ def waste_alert(**overrides):
     return civic_alert(**{"category": "waste", **overrides})
 
 
-def emergency_contact(**overrides):
-    return {
-        "id": "contact-1",
-        "name": "Test ambulance directory entry",
-        "service": "ambulance",
-        "phone": "108",
-        "details": "Emergency ambulance assistance, 24 hours.",
-        "sourceUrl": "https://example.com/contacts/1",
-        "verifiedAt": "2026-01-01",
-        **overrides,
-    }
-
-
-EMPTY_UPDATES = {"shutdowns": [], "chargingStations": [], "civicAlerts": [], "emergencyContacts": []}
+EMPTY_UPDATES = {"shutdowns": [], "chargingStations": [], "civicAlerts": []}
 RESOURCES = [
     ("/api/shutdowns", "shutdowns", shutdown),
     ("/api/charging-stations", "chargingStations", charging_station),
     ("/api/civic-alerts", "civicAlerts", civic_alert),
     ("/api/civic-alerts", "civicAlerts", traffic_alert),
     ("/api/civic-alerts", "civicAlerts", waste_alert),
-    ("/api/emergency-contacts", "emergencyContacts", emergency_contact),
 ]
 
 
@@ -170,7 +156,6 @@ def test_updates_start_empty_without_changing_state(client):
     client.post("/api/shutdowns", json=shutdown())
     client.post("/api/charging-stations", json=charging_station())
     client.post("/api/civic-alerts", json=civic_alert())
-    client.post("/api/emergency-contacts", json=emergency_contact())
     assert client.get("/api/state").json() == state
 
 
@@ -196,9 +181,6 @@ def test_updates_lifecycle(client, path, key, factory):
         modified.update(title="Revised notice", category="traffic", areas=[], route="Bagalur Road",
                         message="Follow the signed diversion.",
                         startsAt="2026-01-11T10:00:00+05:30", expiresAt="2026-01-11T11:00:00+05:30")
-    else:
-        modified.update(name="Revised contact", service="fire", phone="+91 (4344) 222-222",
-                        details="Call for fire emergencies.")
     url = f"{path}/{original['id']}"
     response = client.put(url, json=modified)
     assert response.status_code == 200
@@ -321,26 +303,22 @@ def test_updates_persist_across_store_reopens(tmp_path):
     original.add_shutdown(shutdown(areas=["SIPCOT", "ஓசூர்"]))
     original.add_charging_station(charging_station())
     original.add_civic_alert(civic_alert())
-    original.add_emergency_contact(emergency_contact())
     reopened = Store(db_path)
     assert reopened.get_updates() == original.get_updates()
     revised_shutdown = shutdown(title="Revised")
     revised_station = charging_station(hours="Daytime")
     revised_alert = traffic_alert(message="Use the diversion.")
-    revised_contact = emergency_contact(phone="1-1-2", details="Revised coverage.")
     assert reopened.update_shutdown(revised_shutdown) == revised_shutdown
     assert reopened.update_charging_station(revised_station) == revised_station
     assert reopened.update_civic_alert(revised_alert) == revised_alert
-    assert reopened.update_emergency_contact(revised_contact) == revised_contact
     reopened = Store(db_path)
     assert reopened.get_updates() == {
         "shutdowns": [revised_shutdown], "chargingStations": [revised_station],
-        "civicAlerts": [revised_alert], "emergencyContacts": [revised_contact],
+        "civicAlerts": [revised_alert],
     }
     assert reopened.delete_shutdown("shutdown-1")
     assert reopened.delete_charging_station("station-1")
     assert reopened.delete_civic_alert("alert-1")
-    assert reopened.delete_emergency_contact("contact-1")
     assert Store(db_path).get_updates() == EMPTY_UPDATES
 
 
@@ -361,7 +339,6 @@ def test_updates_migration_preserves_existing_database(tmp_path, has_existing_up
             conn.execute("DROP TABLE power_shutdowns")
             conn.execute("DROP TABLE charging_stations")
         conn.execute("DROP TABLE civic_alerts")
-        conn.execute("DROP TABLE emergency_contacts")
         conn.execute("CREATE TABLE unrelated_data (value TEXT)")
         conn.execute("INSERT INTO unrelated_data VALUES ('keep me')")
         tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]
@@ -377,10 +354,9 @@ def test_updates_migration_preserves_existing_database(tmp_path, has_existing_up
     migrated.add_shutdown(shutdown())
     migrated.add_charging_station(charging_station())
     migrated.add_civic_alert(civic_alert())
-    migrated.add_emergency_contact(emergency_contact())
     assert Store(db_path).get_updates() == {
         "shutdowns": [shutdown()], "chargingStations": [charging_station()],
-        "civicAlerts": [civic_alert()], "emergencyContacts": [emergency_contact()],
+        "civicAlerts": [civic_alert()],
     }
     assert Store(db_path).get_state() == previous_state
     with sqlite3.connect(db_path) as conn:
@@ -431,25 +407,39 @@ def test_civic_alert_supports_utc_and_compares_absolute_times(client):
     assert client.get("/api/updates").json()["civicAlerts"] == [response.json()]
 
 
-@pytest.mark.parametrize("phone", [
-    "12", "1234567890123456", "++91108", "91+108", "tel:108", "108;ext=1",
-    "108?body=test", "108/112", "1e3", "CALL108", "१०८", "１０８",
-    "108\n", "108\t", "( - )", "+", "108<script>",
-])
-def test_invalid_emergency_phone_rejected_on_create_and_replace(client, phone):
-    original = emergency_contact()
-    assert client.post("/api/emergency-contacts", json=original).status_code == 201
-    invalid = emergency_contact(phone=phone)
-    assert client.post("/api/emergency-contacts", json=invalid).status_code == 422
-    assert client.put("/api/emergency-contacts/contact-1", json=invalid).status_code == 422
-    assert client.get("/api/updates").json()["emergencyContacts"] == [original]
+def test_emergency_contacts_are_not_exposed(client):
+    assert "emergencyContacts" not in client.get("/api/updates").json()
+    assert client.get("/api/emergency-contacts").status_code == 404
+    assert client.post("/api/emergency-contacts", json={}).status_code == 404
+    assert client.put("/api/emergency-contacts/contact-1", json={}).status_code == 404
+    assert client.delete("/api/emergency-contacts/contact-1").status_code == 404
+    schema = client.get("/openapi.json").json()
+    assert not any("emergency-contacts" in path for path in schema["paths"])
+    assert "EmergencyContactIn" not in schema["components"]["schemas"]
 
 
-@pytest.mark.parametrize("phone", ["100", "112", "1098", "1800 123 4567", "+91 (4344) 222-222", "123456789012345"])
-def test_valid_emergency_phone_preserves_display(client, phone):
-    entry = emergency_contact(phone=phone)
-    response = client.post("/api/emergency-contacts", json=entry)
-    assert response.status_code == 201
-    assert response.json() == entry
-    assert client.put("/api/emergency-contacts/contact-1", json=entry).json() == entry
-    assert client.get("/api/updates").json()["emergencyContacts"] == [entry]
+def test_emergency_table_is_not_created_or_removed(tmp_path, client):
+    db_path = tmp_path / "retired-contacts.db"
+    store = Store(db_path)
+    previous_state = store.get_state()
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'emergency_contacts'"
+        ).fetchone() is None
+        # Retired data from an older installation must remain intact and unexposed.
+        conn.execute(
+            "CREATE TABLE emergency_contacts (id TEXT PRIMARY KEY, name TEXT NOT NULL,"
+            " service TEXT NOT NULL, phone TEXT NOT NULL, details TEXT NOT NULL,"
+            " source_url TEXT NOT NULL, verified_at TEXT NOT NULL)"
+        )
+        legacy_record = ("legacy", "Legacy contact", "ambulance", "108", "Legacy instructions",
+                         "https://example.com/legacy", "2026-01-01")
+        conn.execute("INSERT INTO emergency_contacts VALUES (?, ?, ?, ?, ?, ?, ?)", legacy_record)
+
+    reopened = Store(db_path)
+    app.dependency_overrides[get_store] = lambda: reopened
+    assert client.get("/api/updates").json() == EMPTY_UPDATES
+    assert client.get("/api/state").json() == previous_state
+    assert client.delete("/api/emergency-contacts/legacy").status_code == 404
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("SELECT * FROM emergency_contacts").fetchall() == [legacy_record]

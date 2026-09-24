@@ -84,7 +84,7 @@ describe("backend sync", () => {
 
   function mockBackend(handle: (path: string, init?: RequestInit) => Response = () => jsonResponse({})) {
     const fetchMock = vi.fn((path: string, init?: RequestInit) =>
-      Promise.resolve(path === "/api/state" ? jsonResponse(serverState) : path === "/api/updates" ? jsonResponse({ shutdowns: [], chargingStations: [], civicAlerts: [], emergencyContacts: [] }) : handle(path, init)));
+      Promise.resolve(path === "/api/state" ? jsonResponse(serverState) : path === "/api/provider-applications" && !init?.body ? jsonResponse([]) : path === "/api/updates" ? jsonResponse({ shutdowns: [], chargingStations: [], civicAlerts: [] }) : handle(path, init)));
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   }
@@ -236,6 +236,13 @@ describe("expanded service catalogue", () => {
     expect(screen.getByRole("heading", { name: /No verified providers/ })).toBeTruthy();
   });
 
+  it.each(["Plumber", "Electrician", "DSLR & mirrorless camera rental", "Home tuition"])("omits the founder matching message for %s", async (service) => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Book ${service}`) }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: /No (verified providers|approved tutors or coaches)/ })).toBeTruthy());
+    expect(screen.queryByText("Your request will be recorded for the founder to match when an approved provider is available.")).toBeNull();
+  });
+
   it("makes new services and categories available in the admin forms", () => {
     window.location.hash = "#admin";
     render(<App />);
@@ -285,7 +292,7 @@ describe("expanded service catalogue", () => {
       expect(JSON.parse(window.localStorage.getItem(storageKey)!).providerCatalog["badminton-coach"][0].area).toBe("SIPCOT");
     });
 
-    describe("area-prioritized providers", () => {
+    describe("Hosur-wide providers", () => {
       const providers = [
         { id: "a", name: "Attibele provider", area: "Attibele", serviceId: "plumber", phone: "+919999999999", rating: 5, experience: "3 years" },
         { id: "b", name: "Hosur provider", area: "Hosur Town", serviceId: "plumber", phone: "+919999999998", rating: 4.8, experience: "4 years" },
@@ -293,23 +300,21 @@ describe("expanded service catalogue", () => {
         { id: "d", name: "Second Hosur provider", area: "Hosur Town", serviceId: "plumber", phone: "+919999999996", rating: 4.9, experience: "6 years" },
       ];
 
-      it("puts matching areas first, preserves other providers, and displays their real areas", () => {
+      it("lists every provider in catalogue order and displays their base locations without an area selector", () => {
         window.localStorage.setItem(storageKey, JSON.stringify({ providerCatalog: { plumber: providers } }));
         const { container } = render(<App />);
-        fireEvent.change(screen.getByRole("combobox", { name: "Your area" }), { target: { value: "Attibele" } });
+        expect(screen.queryByRole("combobox")).toBeNull();
         fireEvent.click(screen.getByRole("button", { name: /Book Plumber/ }));
         const names = () => Array.from(container.querySelectorAll(".provider-card h2"), (element) => element.textContent);
         expect(names()).toEqual(["Attibele provider", "Hosur provider", "Legacy provider", "Second Hosur provider"]);
-        fireEvent.change(screen.getByRole("combobox", { name: "Your area" }), { target: { value: "Hosur Town" } });
-        expect(names()).toEqual(["Hosur provider", "Second Hosur provider", "Attibele provider", "Legacy provider"]);
+        expect(screen.queryByRole("combobox")).toBeNull();
         expect(Array.from(container.querySelectorAll(".provider-meta span:first-child"), (element) => element.textContent))
-          .toEqual(["Hosur Town", "Hosur Town", "Attibele", "Area not set"]);
-        fireEvent.change(screen.getByRole("combobox", { name: "Your area" }), { target: { value: "Bagalur" } });
+          .toEqual(["Based in: Attibele", "Based in: Hosur Town", "Location not provided", "Based in: Hosur Town"]);
         expect(names()).toEqual(providers.map((provider) => provider.name));
         expect(JSON.parse(window.localStorage.getItem(storageKey)!).providerCatalog.plumber).toEqual(providers);
       });
 
-      it("lets admin assign an existing provider's area and persists its sorting after reload", () => {
+      it("lets admin maintain a provider's base location without changing the listing order", () => {
         window.localStorage.setItem(storageKey, JSON.stringify({ providerCatalog: { plumber: providers } }));
         window.location.hash = "#admin";
         const first = render(<App />);
@@ -318,10 +323,23 @@ describe("expanded service catalogue", () => {
         first.unmount();
         window.location.hash = "";
         const { container } = render(<App />);
-        fireEvent.change(screen.getByRole("combobox", { name: "Your area" }), { target: { value: "SIPCOT" } });
         fireEvent.click(screen.getByRole("button", { name: /Book Plumber/ }));
-        expect(container.querySelector(".provider-card h2")?.textContent).toBe("Legacy provider");
+        expect(container.querySelector(".provider-card h2")?.textContent).toBe("Attibele provider");
+        expect(screen.getByText("Based in: SIPCOT")).toBeTruthy();
         expect(container.querySelectorAll(".provider-card")).toHaveLength(4);
+      });
+
+      it("uses the entered service address in bookings without adding an assumed area", () => {
+        const open = vi.spyOn(window, "open").mockReturnValue(null);
+        window.localStorage.setItem(storageKey, JSON.stringify({ providerCatalog: { plumber: providers } }));
+        render(<App />);
+        fireEvent.click(screen.getByRole("button", { name: /Book Plumber/ }));
+        fireEvent.click(screen.getByRole("button", { name: "Book Attibele provider" }));
+        fireEvent.change(screen.getByLabelText("Service address"), { target: { value: "Test street, Bagalur, Hosur" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send WhatsApp request" }));
+        const message = new URL(String(open.mock.calls[0][0])).searchParams.get("text");
+        expect(message).toContain("Address: Test street, Bagalur, Hosur");
+        expect(message).not.toContain("\nArea:");
       });
     });
   });

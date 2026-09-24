@@ -1,7 +1,12 @@
 // Client for the Hosur Services backend (/api, proxied to FastAPI by Vite in dev).
 
 export type Service = { id: string; name: string; tamil: string; category: string };
-export type Provider = { id: string; name: string; phone: string; rating: number; experience: string; serviceId: string; area?: string };
+export type Provider = { id: string; name: string; phone: string; rating: number | null; experience: string; serviceId: string; area?: string };
+export type RegistrationLanguage = "en" | "ta" | "te" | "kn";
+export type ProviderApplicationInput = { name: string; phone: string; serviceIds: string[]; area: string; experience: string; language: RegistrationLanguage; consent: true };
+export type ProviderApplication = ProviderApplicationInput & { id: string; status: "pending" | "approved" | "rejected"; createdAt: string; reviewedAt: string | null };
+export type ApplicationReceipt = { id: string; status: "pending"; createdAt: string };
+export type ApplicationApproval = { application: ProviderApplication; providers: Provider[] };
 export type Review = { id: string; providerId: string; userName: string; rating: number; comment: string; createdAt: string };
 export type NewsItem = { id: string; badge: string; area: string; title: string; summary: string };
 export type FeedPost = { id: string; author: string; handle: string; location: string; title: string; caption: string; accent: string; tag: string; likes: number; likedBy?: string[]; comments: number; createdAt: string };
@@ -9,8 +14,7 @@ export type PowerShutdown = { id: string; title: string; areas: string[]; starts
 export type ChargingStation = { id: string; name: string; area: string; address: string; connectors: string; hours: string; sourceUrl: string; verifiedAt: string };
 export type CivicCategory = "water" | "traffic" | "waste";
 export type CivicAlert = { id: string; category: CivicCategory; title: string; areas: string[]; route: string; message: string; startsAt: string; expiresAt: string; sourceUrl: string; verifiedAt: string };
-export type EmergencyContact = { id: string; name: string; service: string; phone: string; details: string; sourceUrl: string; verifiedAt: string };
-export type LocalUpdates = { shutdowns: PowerShutdown[]; chargingStations: ChargingStation[]; civicAlerts: CivicAlert[]; emergencyContacts: EmergencyContact[] };
+export type LocalUpdates = { shutdowns: PowerShutdown[]; chargingStations: ChargingStation[]; civicAlerts: CivicAlert[] };
 
 export type HosurState = {
   services: Service[];
@@ -21,6 +25,13 @@ export type HosurState = {
   askedFor: string[];
 };
 
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(`/api${path}`, {
     method,
@@ -29,15 +40,19 @@ async function request<T>(path: string, method = "GET", body?: unknown): Promise
   });
   if (!response.ok) {
     const detail = await response.json().then((data) => data?.detail, () => undefined);
-    throw new Error(typeof detail === "string" ? detail : `${method} /api${path} failed with ${response.status}`);
+    throw new ApiError(response.status, typeof detail === "string" ? detail : `${method} /api${path} failed with ${response.status}`);
   }
   return (response.status === 204 ? undefined : await response.json()) as T;
 }
 
 export const hosurApi = {
+  registerProvider: (application: ProviderApplicationInput) => request<ApplicationReceipt>("/provider-applications", "POST", application),
+  getProviderApplications: () => request<ProviderApplication[]>("/provider-applications"),
+  approveProviderApplication: (id: string) => request<ApplicationApproval>(`/provider-applications/${encodeURIComponent(id)}/approve`, "POST"),
+  rejectProviderApplication: (id: string) => request<ProviderApplication>(`/provider-applications/${encodeURIComponent(id)}/reject`, "POST"),
   getUpdates: async () => {
     const state = await request<LocalUpdates>("/updates");
-    if (!state || !Array.isArray(state.shutdowns) || !Array.isArray(state.chargingStations) || !Array.isArray(state.civicAlerts) || !Array.isArray(state.emergencyContacts)) {
+    if (!state || !Array.isArray(state.shutdowns) || !Array.isArray(state.chargingStations) || !Array.isArray(state.civicAlerts)) {
       throw new Error("The updates service returned an incomplete response. Please check the backend version and retry.");
     }
     return state;
@@ -48,8 +63,6 @@ export const hosurApi = {
   removeChargingStation: (id: string) => request<void>(`/charging-stations/${encodeURIComponent(id)}`, "DELETE"),
   saveCivicAlert: (item: CivicAlert, editing: boolean) => request<CivicAlert>(editing ? `/civic-alerts/${encodeURIComponent(item.id)}` : "/civic-alerts", editing ? "PUT" : "POST", item),
   removeCivicAlert: (id: string) => request<void>(`/civic-alerts/${encodeURIComponent(id)}`, "DELETE"),
-  saveEmergencyContact: (item: EmergencyContact, editing: boolean) => request<EmergencyContact>(editing ? `/emergency-contacts/${encodeURIComponent(item.id)}` : "/emergency-contacts", editing ? "PUT" : "POST", item),
-  removeEmergencyContact: (id: string) => request<void>(`/emergency-contacts/${encodeURIComponent(id)}`, "DELETE"),
   getState: () => request<HosurState>("/state"),
   addService: (service: Service) => request<Service>("/services", "POST", service),
   addProvider: (provider: Provider) => request<Provider>("/providers", "POST", provider),
